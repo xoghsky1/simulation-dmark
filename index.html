@@ -132,8 +132,8 @@ const HOUSE = {
   // 바닥 구역 [x0,z0,x1,z1, 종류]  (wood/tile/entry/deck)
   floors: [
     [3.08,0, 8.08,5.57,'wood'],   // 주방 + 거실
-    [8.08,1.97, 8.28,3.31,'wood'],// 거실→현관 통로
-    [5.91,0, 8.28,1.97,'tile'],   // 욕실
+    [8.08,1.24, 8.28,3.31,'wood'],// 거실→현관 통로
+    [5.91,0, 8.28,1.24,'tile'],   // 욕실 (거실 쪽으로 줄임)
     [8.28,1.5, 9.8,3.31,'entry'], // 현관
     [0,1.75, 2.45,3.17,'wood'],   // 침실 (위쪽)
     [1.5,0.84, 2.45,1.75,'wood'], // 침실 안쪽 알코브
@@ -145,7 +145,7 @@ const HOUSE = {
   walls: [
     [3.08,0, 5.91,0],                  // 주방 윗벽
     [5.91,0, 8.28,0], [8.28,0, 8.28,1.5], // 욕실 윗벽/오른벽
-    [5.91,1.97, 7.04,1.97,'glass'], [7.57,1.97, 8.28,1.97,'glass'], // 욕실 아랫벽: 투명 유리 (문 7.04~7.57)
+    [5.91,1.24, 7.04,1.24,'glass'], [7.57,1.24, 8.28,1.24,'glass'], // 욕실 아랫벽: 투명 유리 (문 7.04~7.57)
     [8.28,1.5, 9.8,1.5], [9.8,1.5, 9.8,2.5], [9.8,3.2, 9.8,3.31], [8.08,3.31, 9.8,3.31], // 현관 (현관문 z 2.5~3.2)
     [8.08,3.31, 8.08,5.57],            // 거실 오른벽
     [0,5.57, 1.9,5.57], [2.6,5.57, 3.3,5.57], [5.2,5.57, 8.08,5.57], // 침실 아랫벽 (테라스 문 1.9~2.6) / 거실 아랫벽 (옷방 유리문 3.3~5.2)
@@ -156,10 +156,10 @@ const HOUSE = {
     [5.53,5.57, 5.53,8.11], [2.64,8.11, 5.53,8.11], // 옷방 오른벽/아랫벽
     [0,5.57, 0,8.11, 1.0], [0,8.11, 2.64,8.11, 1.0], // 테라스 난간
   ],
-  solids: [ [5.37,0, 5.91,1.97], [2.45,0.84, 3.08,3.17], [2.64,7.35, 3.2,8.11] ],
+  solids: [ [5.37,0, 5.91,1.24], [2.45,0.84, 3.08,3.17], [2.64,7.35, 3.2,8.11] ],
   // 거실 쪽 여닫이 유리문 (진한 틴트 유리, 사람이 다가가면 열림): x 벽선, z0~z1, 문짝 수
   doors: [ { z:5.57, x0:3.3, x1:5.2, n:2, slide:true },  // 거실 아래쪽 옷방 (틴트 유리, 왼쪽으로 슬라이딩)
-           { z:1.97, x0:7.04, x1:7.57, n:1, clear:true, swing:-1 } ],  // 욕실 (투명 유리, 다 보임) // 기둥·붙박이장·덕트
+           { z:1.24, x0:7.04, x1:7.57, n:1, clear:true, swing:-1 } ],  // 욕실 (투명 유리, 다 보임) // 기둥·붙박이장·덕트
   // 창문: 벽선 위 [x1,z1,x2,z2, 아래높이, 위높이]
   windows: [
     [3.37,8.11, 5.1,8.11, 0.8,2.1], // 옷방 창
@@ -272,7 +272,7 @@ const doorObjs = [];
     const top=new THREE.Mesh(new THREE.BoxGeometry(d.x1-d.x0,0.05,0.14), frameM); top.position.set((d.x0+d.x1)/2, HOUSE.H-0.025, d.z); scene.add(top); }
 }
 function updateDoors(dt){
-  const people=[]; if (me) people.push(me); for (const o of others.values()) people.push(o.av);
+  const people=[]; if (me) people.push(me); for (const o of others.values()) people.push(o.av); if (typeof NPC!=='undefined') people.push(NPC.av);
   for (const d of doorObjs){ const near = people.some(a=>Math.hypot(a.x-d.cx, a.z-d.cz) < 1.6); const tgt = near ? 1.5 : 0;
     d.ang += (tgt-d.ang)*Math.min(1,dt*5); if (d.slide) d.pivot.position.x = d.slide.from + (d.slide.to-d.slide.from)*d.ang/1.5; else d.pivot.rotation.y = d.sign*d.ang; }
 }
@@ -379,7 +379,7 @@ const faceTo = (x,z) => Math.atan2(TB.x-x, TB.z-z);
   for (const [dz,rot] of [[-0.55,0.2],[0.3,-0.15]]){ const pl=box(0.14,0.38,0.5,'#f6f3ec',sx-0.17,0.68,TB.z+dz); pl.rotation.z=rot; }
 }
 // 흰 타원 테이블 + 진회색 A자 다리 (사진 참고, 주방 쪽)
-{ const ox=4.85*SCALE, oz=2.0*SCALE+0.75; const top=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.04,40), mat('#f2f0ec')); top.scale.set(1.5,1,0.8); top.position.set(ox,0.74,oz); scene.add(top); addBox(ox-0.72,oz-0.38,ox+0.72,oz+0.38);
+{ const ox=3.08*SCALE+T/2+0.76, oz=2.0*SCALE+0.75; // 왼쪽 벽에 밀착 const top=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.04,40), mat('#f2f0ec')); top.scale.set(1.5,1,0.8); top.position.set(ox,0.74,oz); scene.add(top); addBox(ox-0.72,oz-0.38,ox+0.72,oz+0.38);
   for (const sx of [-1,1]) for (const sz of [-1,1]){ const l=box(0.04,0.78,0.04,'#3a3d3f',ox+sx*0.45,0.37,oz+sz*0.18); l.rotation.z=sx*0.18; l.rotation.x=-sz*0.12; }
   box(0.5,0.38,0.06,'#fff',ox+0.35,0.95,oz-0.15); }
 // 벽걸이 TV (거실 오른벽, 예전 소파 자리)
@@ -428,7 +428,7 @@ ANC={x:8.28,z:0};
 ANC={x:8.28,z:0};
 ANC={x:5.91,z:0};
 // 럭셔리 변기 (금빛 시트 + 하단 LED) — 앉을 수 있음, 가까이 가면 💩 버튼
-const TOILET = { x: 8.28*SCALE - T/2 - 0.5, z: 2.45, seat: -1 };
+const TOILET = { x: 8.28*SCALE - T/2 - 0.5, z: 1.24*SCALE - T/2 - 0.42, seat: -1 };
 { ANC=null; const tx=TOILET.x, tz=TOILET.z;
   const porc = new THREE.MeshPhongMaterial({ color:'#ffffff', shininess:110, specular:'#cfd8e0' });
   const gold = new THREE.MeshPhongMaterial({ color:'#d6a93e', shininess:95, specular:'#fff3c4', emissive:'#2a1d00' });
@@ -729,6 +729,60 @@ function act(type){
   scheduleTrack();
 }
 $('aPour').onclick=()=>act('pour'); $('aCheers').onclick=()=>act('cheers'); $('aShot').onclick=()=>act('shot');
+/* ---------------- NPC 창주: 집 안을 돌아다님 ----------------
+   위치는 시계(Date.now)로만 정해져서 서버 없이도 모든 사람 화면에서 같은 자리에 보임 */
+const NPC = (()=>{
+  const av = new Avatar('npc', '창주', '#f4f4f4');
+  av.leg.children[0].material = mat('#1d1d1f');
+  // 얼굴을 사진으로
+  av.body.children.forEach(m=>{ if (m.geometry && m.geometry.type==='SphereGeometry' && m.geometry.parameters.radius<0.03) m.visible=false; });
+  const fc=document.createElement('canvas'); fc.width=fc.height=256; const ftex=new THREE.CanvasTexture(fc); ftex.colorSpace=THREE.SRGBColorSpace;
+  const face=new THREE.Mesh(new THREE.CircleGeometry(0.175,32), new THREE.MeshBasicMaterial({ map:ftex, transparent:true })); face.position.set(0,1.17,0.207); av.body.add(face);
+  const im=new Image(); im.onload=()=>{ const g=fc.getContext('2d'); g.beginPath(); g.arc(128,128,128,0,Math.PI*2); g.clip(); g.drawImage(im, 178,72,110,110, 0,0,256,256); ftex.needsUpdate=true; }; im.src='tv.jpg';
+  // 길찾기 그리드 (바닥 위 + 충돌 상자 피해서)
+  const C=0.2, GW=Math.ceil(HOUSE.W/C), GD=Math.ceil(HOUSE.D/C); let free=null;
+  const onFloor=(x,z)=>HOUSE.floors.some(f=>x>f[0]-0.15&&x<f[2]+0.15&&z>f[1]-0.15&&z<f[3]+0.15);
+  const blocked=(x,z)=>{ const r=R+0.05; return colliders.some(b=>x>b.x0-r&&x<b.x1+r&&z>b.z0-r&&z<b.z1+r); };
+  function grid(){ if (free) return; free=new Uint8Array(GW*GD); for (let j=0;j<GD;j++) for (let i=0;i<GW;i++){ const x=(i+.5)*C, z=(j+.5)*C; free[j*GW+i] = onFloor(x,z)&&!blocked(x,z) ? 1 : 0; } }
+  const cell=(x,z)=>{ let i=clamp(Math.floor(x/C),0,GW-1), j=clamp(Math.floor(z/C),0,GD-1); if (free[j*GW+i]) return [i,j];
+    let best=null, bd=1e9; for (let jj=0;jj<GD;jj++) for (let ii=0;ii<GW;ii++) if (free[jj*GW+ii]){ const d=(ii-i)**2+(jj-j)**2; if (d<bd){bd=d;best=[ii,jj];} } return best; };
+  const los=(a,b)=>{ const n=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/0.08); for (let k=1;k<n;k++){ const x=a[0]+(b[0]-a[0])*k/n, z=a[1]+(b[1]-a[1])*k/n; const i=Math.floor(x/C), j=Math.floor(z/C); if (!free[j*GW+i]) return false; } return true; };
+  function path(a,b){ const [si,sj]=cell(a[0],a[1]), [ti,tj]=cell(b[0],b[1]); const prev=new Int32Array(GW*GD).fill(-1); const q=[sj*GW+si]; prev[q[0]]=q[0];
+    for (let h=0; h<q.length; h++){ const c=q[h]; if (c===tj*GW+ti) break; const i=c%GW, j=(c/GW)|0;
+      for (const [di,dj] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){ const ni=i+di, nj=j+dj; if (ni<0||nj<0||ni>=GW||nj>=GD) continue; const n=nj*GW+ni;
+        if (!free[n] || prev[n]>=0) continue; if (di&&dj && (!free[j*GW+ni] || !free[nj*GW+i])) continue; prev[n]=c; q.push(n); } }
+    const out=[]; let c=tj*GW+ti; if (prev[c]<0) return [a,b]; while (c!==prev[c]){ out.push([(c%GW+.5)*C, ((c/GW|0)+.5)*C]); c=prev[c]; } out.push([(si+.5)*C,(sj+.5)*C]); out.reverse();
+    const sm=[out[0]]; let k=0; while (k<out.length-1){ let m=out.length-1; while (m>k+1 && !los(out[k],out[m])) m--; sm.push(out[m]); k=m; } return sm; }
+  // 들르는 곳 + 머무는 시간 + 한마디
+  const S=SCALE, stops=[
+    { p:[8.9,2.4], wait:6, say:'창주는 예민해' },                 // 현관
+    { p:[7.5,1.0], wait:5, say:'유리문이라 다 보이네…' },          // 화장실
+    { p:[4.6,1.2], wait:5, say:'안주 뭐 있냐' },                  // 주방
+    { p:[7.0,4.9], wait:7, say:'한 잔 줘 🍶' },                   // 거실 아래쪽
+    { p:[4.4,7.0], wait:5, say:'옷 정리 좀 해야 되는데' },          // 옷방
+    { p:[1.4,4.2], wait:6, say:'잠깐 누울까…' },                  // 침실
+    { p:[1.2,6.8], wait:7, say:'별 예쁘다 ✨' },                   // 테라스
+    { p:[5.0,2.9], wait:5, say:'줴줴이야' },                      // 거실 테이블 옆
+  ].map(o=>({ ...o, p:[o.p[0]*S, o.p[1]*S] }));
+  const SPEED=0.9; let route=null, total=0;
+  function build(){ grid(); route=[]; let t=0;
+    stops.forEach((st,i)=>{ const nx=stops[(i+1)%stops.length]; const ps=path(st.p, nx.p);
+      route.push({ kind:'wait', t0:t, t1:t+st.wait, x:ps[0][0], z:ps[0][1], say:st.say, idx:i }); t+=st.wait;
+      for (let k=0;k<ps.length-1;k++){ const a=ps[k], b=ps[k+1], d=Math.hypot(b[0]-a[0],b[1]-a[1]); if (d<1e-3) continue; route.push({ kind:'walk', t0:t, t1:t+d/SPEED, a, b }); t+=d/SPEED; } });
+    total=t; }
+  let lastSay=-1, seg=0;
+  function update(dt, t){
+    if (!route) build();
+    const now=(Date.now()/1000) % total; if (!route[seg] || now<route[seg].t0 || now>=route[seg].t1){ seg=route.findIndex(r=>now>=r.t0&&now<r.t1); if (seg<0) seg=0; }
+    const r=route[seg];
+    if (r.kind==='walk'){ const k=(now-r.t0)/(r.t1-r.t0); av.x=r.a[0]+(r.b[0]-r.a[0])*k; av.z=r.a[1]+(r.b[1]-r.a[1])*k; av.ry=Math.atan2(r.b[0]-r.a[0], r.b[1]-r.a[1]); av.moving=true; }
+    else { av.x=r.x; av.z=r.z; av.moving=false;
+      if (me){ const d=Math.hypot(me.x-av.x, me.z-av.z); if (d<3) av.ry=Math.atan2(me.x-av.x, me.z-av.z); }
+      const key=Math.floor((Date.now()/1000)/total)*100+r.idx; if (key!==lastSay && now-r.t0<1.5){ lastSay=key; av.say(r.say); } }
+    av.tick(dt, t);
+  }
+  return { av, update, get route(){ if (!route) build(); return route; } };
+})();
 /* ---------------- 💩 똥싸기 (변기 근처에서만) ---------------- */
 let wantPoop=false, poopCd=0, poopBusy=0;
 const poopMat = new THREE.MeshPhongMaterial({ color:'#7a4a1e', shininess:60, specular:'#c89a5a' });
@@ -752,14 +806,17 @@ function poopFx(av, audible){
   sys(`💩 ${av.name} 볼일 보는 중… (유리문이라 다 보임)`);
 }
 function poop(){ if (!me || me.dead) return; audio();
-  if (me.sit!==TOILET.seat){ if (seatTakenBy(TOILET.seat)){ toast('누가 쓰는 중이에요 🚽'); return; } wantPoop=true; sitAt(TOILET.seat); return; }
+  if (me.sit!==TOILET.seat){ if (seatTakenBy(TOILET.seat)){ toast('누가 쓰는 중이에요 🚽'); return; }
+    const bz=1.24*SCALE, dx=(7.04+7.57)/2*SCALE; if (me.z>bz){ wantPoop=2; goTo(dx, bz+0.45); } else { wantPoop=true; sitAt(TOILET.seat); } return; }
   if (performance.now()<poopCd){ toast('아직 안 나와요… 😣'); return; }
   poopCd=performance.now()+6000; doActEffect(me,'poop',null,true); send('act',{type:'poop'}); }
 $('aPoop').onclick=poop;
 function updatePoopBtn(){ const show = me && !me.dead && (me.sit===TOILET.seat || Math.hypot(me.x-TOILET.x, me.z-TOILET.z) < 1.6);
   const b=$('aPoop'); if (b.style.display !== (show?'':'none')) b.style.display = show?'':'none';
-  if (wantPoop && me && me.sit===TOILET.seat){ wantPoop=false; poop(); }
-  if (wantPoop && !target && me && me.sit!==TOILET.seat) wantPoop=false; }
+  if (wantPoop===2 && me && !target){ const bz=1.24*SCALE, dx=(7.04+7.57)/2*SCALE; if (Math.hypot(me.x-dx, me.z-bz-0.45)<0.3){ wantPoop=3; goTo(dx, bz-0.4); } else wantPoop=false; return; }
+  if (wantPoop===3 && me && !target){ wantPoop=true; sitAt(TOILET.seat); return; }
+  if (wantPoop===true && me && me.sit===TOILET.seat){ wantPoop=false; poop(); }
+  if (wantPoop===true && !target && me && me.sit!==TOILET.seat) wantPoop=false; }
 /* ---------------- 싸움: 펀치/발차기, HP, KO, 부활 ---------------- */
 const ATTACKS = { punch:{dmg:10, range:1.05, cd:0.45, dur:0.4, kb:0.65, label:'퍽!'}, kick:{dmg:18, range:1.35, cd:1.0, dur:0.55, kb:1.4, label:'빡!'} };
 let shake = 0, hitStopUntil = 0;
@@ -951,7 +1008,7 @@ function step(){
     if (Math.abs(av.kvx)+Math.abs(av.kvz)>0.02){ [av.x,av.z]=collide(av.x+av.kvx*dt, av.z+av.kvz*dt); }
     av.tick(dt,t);
   }
-  updateDoors(dt); updateBlood(dt);
+  NPC.update(dt, t); updateDoors(dt); updateBlood(dt);
   for (let i=floaters.length-1;i>=0;i--){ const f=floaters[i]; f.t+=dt; f.s.position.y=(f.y0||1.5)+f.t*(f.big?1.1:0.6); if (f.big){ const sc=f.t<0.12 ? 0.6+f.t/0.12*0.6 : 1.2-Math.min(0.2,(f.t-0.12)); if (!f.base) f.base=f.s.scale.clone(); f.s.scale.set(f.base.x*sc, f.base.y*sc, 1); } f.s.material.opacity=1-f.t/1.4; if (f.t>1.4){ f.parent.remove(f.s); f.s.material.map.dispose(); f.s.material.dispose(); floaters.splice(i,1); } }
   if (markerT>0){ markerT-=dt; marker.material.opacity=markerT; if (markerT<=0) marker.visible=false; }
 
@@ -972,7 +1029,7 @@ function step(){
 }
 requestAnimationFrame(step);
 setInterval(updateHUD, 3000);
-window.__dm = { get me(){return me;}, others, seats, act };
+window.__dm = { get me(){return me;}, others, seats, act, NPC };
 </script>
 </body>
 </html>
