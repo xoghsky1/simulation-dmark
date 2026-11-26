@@ -721,7 +721,7 @@ function connect(){
     const hits = Array.isArray(p.hits) ? p.hits.slice(0,20).filter(h=>typeof h==='string' && h!==p.id) : [];
     for (const h of hits){ if (h===myId) applyHit(me, p.type, o.av); else if (h==='npc') applyHit(NPC.av, p.type, o.av); else { const v=others.get(h); if (v) applyHit(v.av, p.type, o.av); } } });
   channel.subscribe(async (status)=>{
-    if (status==='SUBSCRIBED'){ online=true; $('net').style.display='none'; if (!joinedAt) joinedAt=performance.now(); lastTrack=performance.now(); try { await channel.track(myState()); } catch {} send('mv',{x:me.x,z:me.z,ry:me.ry,vx:0,vz:0,sit:me.sit}); updateHUD();
+    if (status==='SUBSCRIBED'){ visit(); if (!visit.iv) visit.iv=setInterval(visit, 60000); online=true; $('net').style.display='none'; if (!joinedAt) joinedAt=performance.now(); lastTrack=performance.now(); try { await channel.track(myState()); } catch {} send('mv',{x:me.x,z:me.z,ry:me.ry,vx:0,vz:0,sit:me.sit}); updateHUD();
       setTimeout(()=>{ if (others.size+1 > MAX_PLAYERS) toast(`지금 ${others.size+1}명이라 좀 버벅일 수 있어요`); }, 2000); }
     else if (status==='CHANNEL_ERROR' || status==='TIMED_OUT' || status==='CLOSED'){ online=false; $('net').style.display='block'; updateHUD(); }
   });
@@ -851,6 +851,7 @@ const NPC = (()=>{
 /* ---------------- 기록 & 랭킹판 (Supabase에 저장, 방별) ---------------- */
 let firstShotAt=0, cleanStart=false, blackoutDone=false, board=null;
 function record(kind, value){ if (!SBC || !me) return; SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>setTimeout(loadBoard, 600)).catch(()=>{}); }
+function visit(){ if (!SBC || !me) return; SBC.rpc('dmark_visit', { p_room:ROOM, p_sid:myId, p_name:me.name.slice(0,20) }).catch(()=>{}); }
 async function loadBoard(){ if (!SBC) return; try { const { data, error } = await SBC.rpc('dmark_board', { p_room:ROOM }); if (!error && data){ board=data; drawBoard(); } } catch {} }
 const fmtSec = v => { v=Math.round(v); return v>=60 ? `${Math.floor(v/60)}분 ${v%60}초` : `${v}초`; };
 const BOARD_SECTIONS = [
@@ -876,7 +877,11 @@ function drawBoard(){
   });
   boardTex.needsUpdate=true;
   const el=$('rankBody'); if (el){ el.innerHTML=''; BOARD_SECTIONS.forEach(([key,title,fmt])=>{ const h=document.createElement('b'); h.textContent=title; el.appendChild(h); const rows=(board&&board[key])||[]; const ol=document.createElement('div'); ol.className='rk';
-    if (!rows.length){ ol.textContent='아직 기록 없음'; } else rows.slice(0,5).forEach((r,j)=>{ const d=document.createElement('div'); d.textContent=`${j+1}. ${String(r.name).slice(0,12)} — ${fmt(+r.v)}`; ol.appendChild(d); }); el.appendChild(ol); }); }
+    if (!rows.length){ ol.textContent='아직 기록 없음'; } else rows.slice(0,5).forEach((r,j)=>{ const d=document.createElement('div'); d.textContent=`${j+1}. ${String(r.name).slice(0,12)} — ${fmt(+r.v)}`; ol.appendChild(d); }); el.appendChild(ol); });
+    const vs=(board&&board.visitors)||[]; const h=document.createElement('b'); h.textContent=`👥 오늘 다녀간 사람 (${vs.length}명)`; el.appendChild(h); const ol=document.createElement('div'); ol.className='rk';
+    const hm=t=>new Date(t).toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hour12:false});
+    if (!vs.length) ol.textContent='아직 없음'; else vs.forEach(v=>{ const on=Date.now()-new Date(v.last_seen).getTime()<150000; const d=document.createElement('div'); d.textContent=`${on?'🟢':'⚪'} ${String(v.name).slice(0,12)} ${hm(v.first_in)}~${on?'지금':hm(v.last_seen)}`; ol.appendChild(d); });
+    el.appendChild(ol); }
 }
 drawBoard();
 /* ---------------- 술 취함: 3병부터 어질어질, 5병이면 기절 ---------------- */
