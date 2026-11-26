@@ -134,7 +134,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261126b';
+window.APP_VER='v20261126c';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -951,7 +951,7 @@ function poopFx(av, audible){
     setTimeout(()=>{ if (audible) flush(); av.pop('🚽 쏴아아~','#9fe8ff'); const t0=performance.now();
       (function sink(){ const k=(performance.now()-t0)/1200; if (k>=1){ scene.remove(g); return; } g.rotation.y=k*12; g.position.y=0.43-k*0.12; g.scale.setScalar(1-k); requestAnimationFrame(sink); })(); }, 3500);
   }, 1500);
-  sys(`💩 ${av.name} 볼일 보는 중… (유리문이라 다 보임)`);
+  sys(`💩 ${av.name} 똥싸는중`);
 }
 function poop(){ if (!me || me.dead) return; audio();
   if (me.sit!==TOILET.seat){ if (seatTakenBy(TOILET.seat)){ toast('누가 쓰는 중이에요 🚽'); return; }
