@@ -26,6 +26,8 @@ button:active{transform:scale(.96)}
 #actions{right:calc(10px + env(safe-area-inset-right));bottom:calc(64px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(2,64px);gap:8px;pointer-events:auto}
 #actions button{height:64px;width:64px;padding:4px;border-radius:18px;font-size:12px;line-height:1.1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 #actions button span{font-size:24px}
+#actions #aPoop{grid-column:span 2;width:auto;flex-direction:row;gap:6px;font-size:15px;font-weight:700;background:#7a4a1e;border-color:#c98b4a;color:#fff;animation:poopPulse 1.2s ease-in-out infinite}
+@keyframes poopPulse{50%{transform:scale(1.05)}}
 #joy{left:calc(16px + env(safe-area-inset-left));bottom:calc(70px + env(safe-area-inset-bottom));width:120px;height:120px;border-radius:50%;pointer-events:auto;touch-action:none;display:none}
 #joy i{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(255,255,255,.28);border:1px solid rgba(255,255,255,.4)}
 body.touch #joy{display:block}
@@ -77,12 +79,13 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
   PC: WASD/방향키 이동 · 마우스 드래그 시점 · 휠 줌 · Enter 채팅<br>
   폰: 왼쪽 조이스틱 이동 · 화면 드래그 시점 · 두 손가락 줌<br>
   바닥을 톡 누르면 거기로 걸어가요. 방석이나 소파를 누르면 가서 앉아요.<br>
-  단축키: 1 따르기 · 2 짠 · 3 원샷 · 4 줴줴이야 · Space 점프 · F 펀치 · G 발차기 · E 앉기<br>HP가 0이 되면 5초 뒤 현관에서 부활
+  단축키: 1 따르기 · 2 짠 · 3 원샷 · 4 줴줴이야 · Space 점프 · F 펀치 · G 발차기 · E 앉기 · P 똥싸기(변기 근처)<br>HP가 0이 되면 5초 뒤 현관에서 부활
 </div>
 <div id="net" class="hud panel">서버에 다시 연결하는 중…</div>
 <div id="chatlog" class="hud"></div>
 <div id="joy" class="hud panel"><i></i></div>
 <div id="actions" class="hud">
+  <button id="aPoop" style="display:none"><span>💩</span>똥싸기</button>
   <button id="aPour"><span>🍶</span>따르기</button>
   <button id="aCheers"><span>🥂</span>짠!</button>
   <button id="aShot"><span>🥃</span>원샷</button>
@@ -160,10 +163,7 @@ const HOUSE = {
            { z:1.97, x0:7.04, x1:7.57, n:1, clear:true, swing:-1 } ],  // 욕실 (투명 유리, 다 보임) // 기둥·붙박이장·덕트
   // 창문: 벽선 위 [x1,z1,x2,z2, 아래높이, 위높이]
   windows: [
-    [0.3,1.75, 1.3,1.75, 0.9,2.0],  // 침실 위쪽 창
-    [0,1.9, 0,3.0, 0.9,2.0],
     [3.37,8.11, 5.1,8.11, 0.8,2.1], // 옷방 창
-    [0,3.6, 0,5.2, 0.8,2.1],        // 침실1 창
   ],
   table: { x: 5.35, z: 3.95, w: 1.5, d: 0.85, h: 0.36 },  // 거실 좌식 술상
   spawn: { x: 9.0, z: 2.85, ry: -Math.PI/2 },               // 현관에서 시작
@@ -382,8 +382,6 @@ const faceTo = (x,z) => Math.atan2(TB.x-x, TB.z-z);
 { const ox=4.85*SCALE, oz=2.0*SCALE+0.75; const top=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.04,40), mat('#f2f0ec')); top.scale.set(1.5,1,0.8); top.position.set(ox,0.74,oz); scene.add(top); addBox(ox-0.72,oz-0.38,ox+0.72,oz+0.38);
   for (const sx of [-1,1]) for (const sz of [-1,1]){ const l=box(0.04,0.78,0.04,'#3a3d3f',ox+sx*0.45,0.37,oz+sz*0.18); l.rotation.z=sx*0.18; l.rotation.x=-sz*0.12; }
   box(0.5,0.38,0.06,'#fff',ox+0.35,0.95,oz-0.15); }
-// 진회색 카운터 (욕실벽 따라)
-box(1.4,0.8,0.45,'#4a4d50',6.6*SCALE,0.4,1.97*SCALE+0.29,true); box(1.42,0.03,0.47,'#2f3133',6.6*SCALE,0.81,1.97*SCALE+0.29);
 // 벽걸이 TV (거실 오른벽, 예전 소파 자리)
 const tvCanvas=document.createElement('canvas'); tvCanvas.width=1024; tvCanvas.height=576;
 const tvTex=new THREE.CanvasTexture(tvCanvas); tvTex.colorSpace=THREE.SRGBColorSpace;
@@ -413,9 +411,39 @@ ANC={x:9.8,z:1.5};
 box(1.3,1.0,0.32,'#d6cbbb',9.05,0.5,1.68,true);
 // 욕실: 세면대, 변기, 샤워
 ANC={x:8.28,z:0};
-box(0.5,0.85,0.42,'#ffffff',7.98,0.425,0.6,true); box(0.38,0.42,0.6,'#ffffff',7.95,0.21,1.4,true); box(0.18,0.4,0.38,'#fafafa',8.15,0.6,1.4);
+box(0.5,0.85,0.42,'#ffffff',7.98,0.425,0.6,true); /* 변기는 아래 '럭셔리 변기'에서 */
 ANC={x:5.91,z:0};
 cyl(0.12,0.12,0.02,'#c0c6ca',6.3,2.2,0.5,16);
+// 럭셔리 변기 (금빛 시트 + 하단 LED) — 앉을 수 있음, 가까이 가면 💩 버튼
+const TOILET = { x: 8.28*SCALE - T/2 - 0.5, z: 1.4, seat: -1 };
+{ ANC=null; const tx=TOILET.x, tz=TOILET.z;
+  const porc = new THREE.MeshPhongMaterial({ color:'#ffffff', shininess:110, specular:'#cfd8e0' });
+  const gold = new THREE.MeshPhongMaterial({ color:'#d6a93e', shininess:95, specular:'#fff3c4', emissive:'#2a1d00' });
+  const add = (geo, m, x, y, z, sx=1, sz=1) => { const o=new THREE.Mesh(geo, m); o.position.set(x,y,z); o.scale.set(sx,1,sz); scene.add(o); return o; };
+  add(new THREE.CylinderGeometry(0.13,0.17,0.3,28), porc, tx+0.04, 0.15, tz, 1.25, 1);            // 받침
+  add(new THREE.CylinderGeometry(0.21,0.15,0.16,32), porc, tx, 0.36, tz, 1.3, 1);                  // 볼
+  add(new THREE.CircleGeometry(0.15,28).rotateX(-Math.PI/2), new THREE.MeshPhongMaterial({ color:'#5fb6d9', shininess:150, specular:'#fff' }), tx, 0.43, tz, 1.25, 1); // 물
+  add(new THREE.TorusGeometry(0.175,0.032,12,36).rotateX(Math.PI/2), gold, tx, 0.455, tz, 1.25, 1); // 금빛 시트
+  const lid = add(new THREE.CylinderGeometry(0.2,0.2,0.025,32), gold, tx+0.25, 0.68, tz, 1.25, 1); lid.rotation.z = Math.PI/2 - 0.22; // 열린 뚜껑
+  add(new THREE.BoxGeometry(0.2,0.44,0.44), porc, tx+0.36, 0.67, tz);                              // 물탱크
+  add(new THREE.BoxGeometry(0.23,0.04,0.47), gold, tx+0.36, 0.9, tz);                               // 탱크 뚜껑
+  add(new THREE.CylinderGeometry(0.035,0.035,0.02,20), new THREE.MeshPhongMaterial({ color:'#fff', emissive:'#d6a93e', emissiveIntensity:.6 }), tx+0.36, 0.93, tz); // 물 내림 버튼
+  add(new THREE.TorusGeometry(0.2,0.015,8,40).rotateX(Math.PI/2), new THREE.MeshBasicMaterial({ color:'#5ff0ff' }), tx+0.04, 0.02, tz, 1.25, 1); // 바닥 LED 링
+  const glow = new THREE.PointLight('#5ff0ff', 0.9, 1.6); glow.position.set(tx, 0.15, tz); scene.add(glow);
+  // 휴지걸이 + 휴지
+  const wx = 8.28*SCALE - T/2 - 0.02; add(new THREE.BoxGeometry(0.02,0.04,0.2), gold, wx, 0.75, tz+0.5);
+  const roll = add(new THREE.CylinderGeometry(0.06,0.06,0.11,20), mat('#fdfdfd'), wx-0.07, 0.69, tz+0.5); roll.rotation.x = Math.PI/2;
+  addBox(tx+0.22, tz-0.24, wx+0.05, tz+0.24); // 탱크만 충돌 (볼 위엔 앉을 수 있게)
+  TOILET.seat = seats.length; seats.push({ x:tx, z:tz, ry:-Math.PI/2, kind:'toilet' });
+  const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.5,12), new THREE.MeshBasicMaterial({ visible:false })); hit.position.set(tx,0.25,tz); hit.userData.seat=TOILET.seat; scene.add(hit); seatMeshes.push(hit);
+}
+// 옷방 왼쪽 벽 붙박이 옷장
+{ ANC=null; const x0=2.64*SCALE+T/2, z0=5.57*SCALE+0.35, len=2.5, dep=0.6, z1=z0+len;
+  box(dep,2.2,len,'#ece6da',x0+dep/2,1.1,z0+len/2,true);
+  box(0.02,2.14,len-0.04,'#f6f1e8',x0+dep+0.01,1.1,z0+len/2);
+  for (let i=1;i<4;i++) box(0.025,2.12,0.012,'#bdb3a3',x0+dep+0.02,1.1,z0+i*len/4);
+  for (let i=0;i<4;i++) box(0.03,0.32,0.025,'#9b8b73',x0+dep+0.04,1.1,z0+i*len/4+(i%2?0.07:len/4-0.07));
+  box(dep+0.02,0.06,len+0.02,'#d9d0c0',x0+dep/2,2.23,z0+len/2); }
 // 침실1: 침대, 협탁
 ANC={x:0,z:5.57};
 box(2.0,0.35,1.55,'#d8d8d4',1.1,0.175,4.68,true); box(1.96,0.16,1.5,'#fbfaf7',1.12,0.43,4.68); box(0.4,0.1,1.4,'#ffffff',0.3,0.55,4.68); box(1.1,0.1,1.54,'#ece9e2',1.5,0.52,4.68); box(0.5,0.18,0.6,'#e4e0d6',0.9,0.6,4.3);
@@ -524,7 +552,7 @@ class Avatar {
   remove(){ scene.remove(this.g); }
   tick(dt, t){
     const seat = this.sit>=0 ? seats[this.sit] : null;
-    const targetY = this.dead ? 0.12 : seat ? (seat.kind==='sofa' ? 0.42-0.5 : 0.07-0.48) : 0;
+    const targetY = this.dead ? 0.12 : seat ? (seat.kind==='sofa' ? 0.42-0.5 : seat.kind==='toilet' ? 0.46-0.5 : 0.07-0.48) : 0;
     this.body.position.y += (targetY - this.body.position.y) * Math.min(1, dt*10);
     if (this.moving){ this.walk += dt*9; this.body.position.y += Math.abs(Math.sin(this.walk))*0.035; this.body.rotation.z = Math.sin(this.walk)*0.04; }
     else { this.body.rotation.z = Math.sin(t*1.3+this.x)*Math.min(this.drinks,18)*0.006; }
@@ -599,7 +627,7 @@ let camYaw = Math.PI, camPitch = 0.42, camDist = 3.2;
 
 function seatTakenBy(i){ if (me && me.sit===i) return myId; for (const [id,o] of others) if (o.av.sit===i) return id; return null; }
 function nearestFreeSeat(x,z,cushionOnly=false){ let best=-1, bd=1e9; seats.forEach((s,i)=>{ if (seatTakenBy(i) || (cushionOnly && s.kind!=='cushion')) return; const d=Math.hypot(s.x-x,s.z-z); if (d<bd){bd=d;best=i;} }); return best; }
-function standUp(){ if (me.sit>=0){ const s=seats[me.sit]; me.sit=-1; const away = s.kind==='sofa' ? [-0.6,0] : [Math.sin(s.ry)*-0.45, Math.cos(s.ry)*-0.45]; [me.x,me.z]=collide(s.x+away[0], s.z+away[1]); sendMove(true); } }
+function standUp(){ if (me.sit>=0){ const s=seats[me.sit]; me.sit=-1; const away = s.kind==='sofa' ? [-0.6,0] : s.kind==='toilet' ? [Math.sin(s.ry)*0.6, Math.cos(s.ry)*0.6] : [Math.sin(s.ry)*-0.45, Math.cos(s.ry)*-0.45]; [me.x,me.z]=collide(s.x+away[0], s.z+away[1]); sendMove(true); } }
 function goTo(x,z,seat=-1){ if (me.dead) return; if (me.sit>=0) standUp(); target={x,z,seat}; sendMove(true); }
 function sitAt(i){ const s=seats[i]; if (!s) return; if (seatTakenBy(i) && seatTakenBy(i)!==myId){ toast('누가 앉아 있어요'); return; } goTo(s.x, s.z, i); }
 
@@ -674,6 +702,7 @@ function doActEffect(av, type, p, mine){
   if (type==='pour'){ av.setFill(1); av.pop('🍶 쪼르륵','#bff5c8'); if (mine||near) glug(); }
   else if (type==='cheers'){ av.raise=1.2; av.pop('짠! 🥂'); if (mine||near) clink(mine?0.4:0.25); }
   else if (type==='jump'){ av.jump=0.6; }
+  else if (type==='poop'){ poopFx(av, mine||near); }
   else if (type==='ko'){ av.dead=true; av.setHp(0); sys(`💀 ${av.name} KO!${p && p.by ? ' ('+String(p.by).slice(0,12)+' 승)' : ''}`); }
   else if (type==='respawn'){ av.dead=false; av.setHp(100); av.sit=-1; av.x=HOUSE.spawn.x; av.z=HOUSE.spawn.z; av.ry=HOUSE.spawn.ry; av.pop('부활!','#9fe8ff'); }
   else if (type==='shot'){ av.setFill(0); av.raise=1.0; if (p && p.d!=null) av.setDrinks(p.d); av.pop(['캬~','크으','원샷!','한 잔 더'][Math.floor(Math.random()*4)],'#ffffff'); if (mine||near) gulp(); updateHUD(); }
@@ -687,6 +716,37 @@ function act(type){
   scheduleTrack();
 }
 $('aPour').onclick=()=>act('pour'); $('aCheers').onclick=()=>act('cheers'); $('aShot').onclick=()=>act('shot');
+/* ---------------- 💩 똥싸기 (변기 근처에서만) ---------------- */
+let wantPoop=false, poopCd=0, poopBusy=0;
+const poopMat = new THREE.MeshPhongMaterial({ color:'#7a4a1e', shininess:60, specular:'#c89a5a' });
+function fart(){ const a=audio(); if(!a) return; const t=a.currentTime; const o=a.createOscillator(), g=a.createGain(), l=a.createOscillator(), lg=a.createGain();
+  o.type='sawtooth'; o.frequency.setValueAtTime(95,t); o.frequency.linearRampToValueAtTime(60,t+0.7); l.frequency.value=22; lg.gain.value=25; l.connect(lg).connect(o.frequency);
+  const f=a.createBiquadFilter(); f.type='lowpass'; f.frequency.value=420; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.45,t+0.05); g.gain.exponentialRampToValueAtTime(0.0001,t+0.75);
+  o.connect(f).connect(g).connect(a.destination); o.start(t); l.start(t); o.stop(t+0.8); l.stop(t+0.8); }
+function plop(){ const a=audio(); if(!a) return; const t=a.currentTime; const o=a.createOscillator(), g=a.createGain(); o.type='sine'; o.frequency.setValueAtTime(900,t); o.frequency.exponentialRampToValueAtTime(160,t+0.12); g.gain.setValueAtTime(0.4,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.16); o.connect(g).connect(a.destination); o.start(t); o.stop(t+0.18); }
+function flush(){ const a=audio(); if(!a) return; const t=a.currentTime; const n=a.createBufferSource(); const buf=a.createBuffer(1,a.sampleRate*1.6,a.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<d.length;i++){ const k=i/d.length; d[i]=(Math.random()*2-1)*Math.min(1,k*8)*Math.pow(1-k,1.5); } n.buffer=buf;
+  const f=a.createBiquadFilter(); f.type='bandpass'; f.frequency.setValueAtTime(700,t); f.frequency.exponentialRampToValueAtTime(250,t+1.5); f.Q.value=0.7; const g=a.createGain(); g.gain.value=0.5; n.connect(f).connect(g).connect(a.destination); n.start(t); }
+function poopFx(av, audible){
+  av.pop('끄으응… 😣','#e8c08a');
+  if (audible) setTimeout(fart, 700);
+  setTimeout(()=>{ av.pop('뿌직! 💩','#c98b4a', true); if (audible) plop();
+    const g=new THREE.Group(); [[0.07,0],[0.055,0.05],[0.04,0.09]].forEach(([r,y])=>{ const m=new THREE.Mesh(new THREE.SphereGeometry(r,14,10), poopMat); m.scale.y=0.7; m.position.y=y; g.add(m); });
+    const tip=new THREE.Mesh(new THREE.ConeGeometry(0.025,0.05,12), poopMat); tip.position.y=0.125; g.add(tip);
+    g.position.set(TOILET.x, 0.43, TOILET.z); scene.add(g);
+    setTimeout(()=>{ if (audible) flush(); av.pop('🚽 쏴아아~','#9fe8ff'); const t0=performance.now();
+      (function sink(){ const k=(performance.now()-t0)/1200; if (k>=1){ scene.remove(g); return; } g.rotation.y=k*12; g.position.y=0.43-k*0.12; g.scale.setScalar(1-k); requestAnimationFrame(sink); })(); }, 3500);
+  }, 1500);
+  sys(`💩 ${av.name} 볼일 보는 중… (유리문이라 다 보임)`);
+}
+function poop(){ if (!me || me.dead) return; audio();
+  if (me.sit!==TOILET.seat){ if (seatTakenBy(TOILET.seat)){ toast('누가 쓰는 중이에요 🚽'); return; } wantPoop=true; sitAt(TOILET.seat); return; }
+  if (performance.now()<poopCd){ toast('아직 안 나와요… 😣'); return; }
+  poopCd=performance.now()+6000; doActEffect(me,'poop',null,true); send('act',{type:'poop'}); }
+$('aPoop').onclick=poop;
+function updatePoopBtn(){ const show = me && !me.dead && (me.sit===TOILET.seat || Math.hypot(me.x-TOILET.x, me.z-TOILET.z) < 1.6);
+  const b=$('aPoop'); if (b.style.display !== (show?'':'none')) b.style.display = show?'':'none';
+  if (wantPoop && me && me.sit===TOILET.seat){ wantPoop=false; poop(); }
+  if (wantPoop && !target && me && me.sit!==TOILET.seat) wantPoop=false; }
 /* ---------------- 싸움: 펀치/발차기, HP, KO, 부활 ---------------- */
 const ATTACKS = { punch:{dmg:10, range:1.05, cd:0.45, dur:0.4, kb:0.65, label:'퍽!'}, kick:{dmg:18, range:1.35, cd:1.0, dur:0.55, kb:1.4, label:'빡!'} };
 let shake = 0, hitStopUntil = 0;
@@ -788,7 +848,7 @@ addEventListener('keydown', e=>{
   if (e.key==='Enter'){ e.preventDefault(); $('chatin').focus(); return; }
   if (e.code==='Space'){ e.preventDefault(); jump(); return; }
   const k=e.key.toLowerCase(); input.keys.add(k);
-  if (k==='1') act('pour'); if (k==='2') act('cheers'); if (k==='3') act('shot'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick');
+  if (k==='1') act('pour'); if (k==='2') act('cheers'); if (k==='3') act('shot'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop();
 });
 addEventListener('keyup', e=>input.keys.delete(e.key.toLowerCase()));
 addEventListener('blur', ()=>input.keys.clear());
@@ -845,6 +905,7 @@ const clock=new THREE.Clock(); const camTarget=new THREE.Vector3(); const camRay
 camera.position.set(HOUSE.table.x, 1.8, 5.2); camera.lookAt(HOUSE.table.x, 0.6, HOUSE.table.z);
 function step(){
   let dt=Math.min(0.05, clock.getDelta()); const t=clock.elapsedTime; if (performance.now()<hitStopUntil) dt*=0.08;
+  updatePoopBtn();
   if (me){
     // 입력 → 이동 (카메라 기준)
     let ix=input.x, iz=input.z; const K=input.keys;
@@ -883,7 +944,7 @@ function step(){
 
   // 카메라
   if (me){
-    const headY = me.sit>=0 ? (seats[me.sit].kind==='sofa'?1.0:0.85) : 1.35;
+    const headY = me.sit>=0 ? (seats[me.sit].kind!=='cushion'?1.0:0.85) : 1.35;
     camTarget.set(me.x, headY, me.z);
     const wob = me.drinks>7 ? Math.sin(t*0.9)*Math.min(me.drinks-7,12)*0.004 : 0;
     const dir=new THREE.Vector3(Math.sin(camYaw)*Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw)*Math.cos(camPitch));
