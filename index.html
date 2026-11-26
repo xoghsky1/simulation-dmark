@@ -756,7 +756,7 @@ const NPC = (()=>{
   // 들르는 곳 + 머무는 시간 + 한마디
   const S=SCALE, stops=[
     { p:[8.9,2.4], wait:6, say:'창주는 예민해' },                 // 현관
-    { p:[7.5,1.0], wait:5, say:'유리문이라 다 보이네…' },          // 화장실
+    { p:[7.5,1.0], wait:5, say:'' },          // 화장실
     { p:[4.6,1.2], wait:5, say:'안주 뭐 있냐' },                  // 주방
     { p:[7.0,4.9], wait:7, say:'한 잔 줘 🍶' },                   // 거실 아래쪽
     { p:[4.4,7.0], wait:5, say:'옷 정리 좀 해야 되는데' },          // 옷방
@@ -787,7 +787,7 @@ const NPC = (()=>{
     else if (r.kind==='walk'){ const k=(now-r.t0)/(r.t1-r.t0); av.x=r.a[0]+(r.b[0]-r.a[0])*k; av.z=r.a[1]+(r.b[1]-r.a[1])*k; av.moving=false; }
     else { av.x=r.x; av.z=r.z; av.moving=false;
       if (me){ const d=Math.hypot(me.x-av.x, me.z-av.z); if (d<3) av.ry=Math.atan2(me.x-av.x, me.z-av.z); }
-      const key=Math.floor((Date.now()/1000)/total)*100+r.idx; if (key!==lastSay && now-r.t0<1.5 && performance.now()-lastHurt>4000){ lastSay=key; av.say(r.say); } }
+      const key=Math.floor((Date.now()/1000)/total)*100+r.idx; if (key!==lastSay && now-r.t0<1.5 && performance.now()-lastHurt>4000){ lastSay=key; if (r.say) av.say(r.say); } }
     if (Math.abs(ox)+Math.abs(oz)>0.01){ [av.x,av.z]=collide(av.x+ox, av.z+oz); }
     av.tick(dt, t);
   }
