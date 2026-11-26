@@ -718,7 +718,7 @@ function connect(){
     const hits = Array.isArray(p.hits) ? p.hits.slice(0,20).filter(h=>typeof h==='string' && h!==p.id) : [];
     for (const h of hits){ if (h===myId) applyHit(me, p.type, o.av); else if (h==='npc') applyHit(NPC.av, p.type, o.av); else { const v=others.get(h); if (v) applyHit(v.av, p.type, o.av); } } });
   channel.subscribe(async (status)=>{
-    if (status==='SUBSCRIBED'){ visit(); if (!visit.iv) visit.iv=setInterval(visit, 60000); online=true; $('net').style.display='none'; if (!joinedAt) joinedAt=performance.now(); lastTrack=performance.now(); try { await channel.track(myState()); } catch {} send('mv',{x:me.x,z:me.z,ry:me.ry,vx:0,vz:0,sit:me.sit}); updateHUD();
+    if (status==='SUBSCRIBED'){ setTimeout(visit, 500); if (!visit.iv) visit.iv=setInterval(visit, 60000); online=true; $('net').style.display='none'; if (!joinedAt) joinedAt=performance.now(); lastTrack=performance.now(); try { await channel.track(myState()); } catch {} send('mv',{x:me.x,z:me.z,ry:me.ry,vx:0,vz:0,sit:me.sit}); updateHUD();
       setTimeout(()=>{ if (others.size+1 > MAX_PLAYERS) toast(`지금 ${others.size+1}명이라 좀 버벅일 수 있어요`); }, 2000); }
     else if (status==='CHANNEL_ERROR' || status==='TIMED_OUT' || status==='CLOSED'){ online=false; $('net').style.display='block'; updateHUD(); }
   });
@@ -847,9 +847,9 @@ const NPC = (()=>{
 })();
 /* ---------------- 기록 & 랭킹판 (Supabase에 저장, 방별) ---------------- */
 let firstShotAt=0, cleanStart=false, blackoutDone=false, board=null;
-function record(kind, value){ if (!SBC || !me) return; SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>setTimeout(loadBoard, 600)).catch(()=>{}); }
-function visit(){ if (!SBC || !me) return; SBC.rpc('dmark_visit', { p_room:ROOM, p_sid:myId, p_name:me.name.slice(0,20) }).catch(()=>{}); }
-async function loadBoard(){ if (!SBC) return; try { const { data, error } = await SBC.rpc('dmark_board', { p_room:ROOM }); if (!error && data){ board=data; drawBoard(); } } catch {} }
+function record(kind, value){ if (!SBC || !me) return; try { SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>setTimeout(loadBoard, 600), ()=>{}); } catch {} }
+function visit(){ if (!SBC || !me) return; try { SBC.rpc('dmark_visit', { p_room:ROOM, p_sid:myId, p_name:me.name.slice(0,20) }).then(()=>{}, ()=>{}); } catch {} }
+async function loadBoard(){ if (!SBC) return; try { const { data, error } = await SBC.rpc('dmark_board', { p_room:ROOM }); if (!error && data){ board=data; drawBoard(); } } catch (e) { console.warn(e); } }
 const fmtSec = v => { v=Math.round(v); return v>=60 ? `${Math.floor(v/60)}분 ${v%60}초` : `${v}초`; };
 const BOARD_SECTIONS = [
   ['allDrinks','🍶 역대 주량', v=>`${v}잔 (${(v/EMPTY_BOTTLES_PER).toFixed(1)}병)`],
