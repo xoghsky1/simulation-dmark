@@ -52,6 +52,11 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 #net{left:50%;top:calc(56px + env(safe-area-inset-top));transform:translateX(-50%);padding:6px 12px;font-size:12px;display:none;color:var(--accent2)}
 #help{top:calc(60px + env(safe-area-inset-top));right:10px;padding:10px 12px;font-size:12px;line-height:1.6;color:var(--muted);max-width:250px;display:none}
 #help.show{display:block}
+#rank{top:calc(60px + env(safe-area-inset-top));right:10px;padding:10px 12px;font-size:13px;line-height:1.6;max-width:280px;max-height:70vh;overflow:auto;display:none;pointer-events:auto;z-index:8}
+#rank.show{display:block}
+#rank b{display:block;margin-top:8px}
+#rank .rk{color:var(--muted)}
+#rankClose{padding:2px 8px}
 #gate{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 30%,#3a2a1c 0%,#120e0b 70%);padding:16px}
 #gate .card{width:100%;max-width:360px;padding:24px 20px;text-align:center}
 #gate h1{margin:6px 0 4px;font-size:24px}
@@ -76,10 +81,12 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
     <div id="who"></div>
   </div>
   <div id="topbtns">
+    <button id="rankbtn">🏆</button>
     <button id="invite">🔗 초대</button>
     <button id="helpbtn">❔</button>
   </div>
 </div>
+<div id="rank" class="hud panel"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">🏆 명예의 전당</b><button id="rankClose">✕</button></div><div id="rankBody"></div></div>
 <div id="help" class="hud panel">
   <b style="color:var(--text)">조작법</b><br>
   PC: WASD/방향키 이동 · 마우스 드래그 시점 · 휠 줌 · Enter 채팅<br>
@@ -689,11 +696,12 @@ function applyPresence(){
   for (const [id,o] of others) if (!seen.has(id)){ sys(`${o.av.name} 님이 나갔어요`); o.av.remove(); others.delete(id); }
   updateHUD();
 }
-let joinedAt = 0;
+let joinedAt = 0; let SBC = null;
 function connect(){
   let sb;
   try { sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth:{ persistSession:false, autoRefreshToken:false }, realtime:{ params:{ eventsPerSecond: 15 } } }); }
   catch(e){ console.error(e); $('count').textContent='서버 연결 실패 (혼자 모드)'; return; }
+  SBC = sb; setTimeout(loadBoard, 800); setInterval(loadBoard, 30000);
   channel = sb.channel('dmark-hangout-'+ROOM, { config: { broadcast: { self:false, ack:false }, presence: { key: myId } } });
   channel.on('presence', { event:'sync' }, applyPresence);
   channel.on('broadcast', { event:'mv' }, ({payload:p})=>{
@@ -707,6 +715,7 @@ function connect(){
   });
   channel.on('broadcast', { event:'chat' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); const text=String(p.text||'').slice(0,120); if (!text) return; const name=o?o.av.name:'누군가'; addChat(name, text, o?o.av.color:'#ccc'); if (o) o.av.say(text); });
   channel.on('broadcast', { event:'act' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o) return; if (p.type==='respawn'){ o.net=null; o.target=null; } doActEffect(o.av, String(p.type), p, false); });
+  channel.on('broadcast', { event:'npcatk' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o || !ATTACKS[p.type]) return; NPC.showAtk(p.type); applyHit(o.av, p.type, NPC.av); });
   channel.on('broadcast', { event:'atk' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); const A=ATTACKS[p.type]; if (!o || !A || o.av.dead) return;
     o.av.atk=A.dur; o.av.atkDur=A.dur; o.av.atkType=p.type; o.av.ry=num(p.ry,o.av.ry); if (near(o.av)) swoosh();
     const hits = Array.isArray(p.hits) ? p.hits.slice(0,20).filter(h=>typeof h==='string' && h!==p.id) : [];
@@ -737,7 +746,7 @@ function act(type){
   if (type==='pour'){ if (me.fill>0.9){ toast('잔 이미 가득 찼어요'); return; } doActEffect(me,'pour',null,true); send('act',{type:'pour'}); }
   else if (type==='cheers'){ doActEffect(me,'cheers',null,true); send('act',{type:'cheers'});
     const n=[...others.values()].filter(o=>Math.hypot(o.av.x-me.x,o.av.z-me.z)<2.6).length; if (n) toast(`${n}명이랑 짠! 🥂`); }
-  else if (type==='shot'){ if (me.fill<0.1){ toast('잔이 비었어요. 먼저 따르세요 🍶'); return; } me.setDrinks(me.drinks+1); bac += 1/EMPTY_BOTTLES_PER; doActEffect(me,'shot',{d:me.drinks},true); send('act',{type:'shot', d:me.drinks}); store.set('dm_drinks_'+new Date().toDateString(), String(me.drinks)); }
+  else if (type==='shot'){ if (me.fill<0.1){ toast('잔이 비었어요. 먼저 따르세요 🍶'); return; } if (!firstShotAt){ firstShotAt=performance.now(); cleanStart = bac<0.15; } me.setDrinks(me.drinks+1); bac += 1/EMPTY_BOTTLES_PER; record('drinks', me.drinks); doActEffect(me,'shot',{d:me.drinks},true); send('act',{type:'shot', d:me.drinks}); store.set('dm_drinks_'+new Date().toDateString(), String(me.drinks)); }
   scheduleTrack();
 }
 $('aPour').onclick=()=>act('pour'); $('aCheers').onclick=()=>act('cheers'); $('aShot').onclick=()=>act('shot');
@@ -782,35 +791,101 @@ const NPC = (()=>{
       route.push({ kind:'wait', t0:t, t1:t+st.wait, x:ps[0][0], z:ps[0][1], say:st.say, idx:i }); t+=st.wait;
       for (let k=0;k<ps.length-1;k++){ const a=ps[k], b=ps[k+1], d=Math.hypot(b[0]-a[0],b[1]-a[1]); if (d<1e-3) continue; route.push({ kind:'walk', t0:t, t1:t+d/SPEED, a, b }); t+=d/SPEED; } });
     total=t; }
-  let lastSay=-1, seg=0, ox=0, oz=0, koUntil=0, lastHurt=0, regen=0;
+  let lastSay=-1, seg=0, ox=0, oz=0, koUntil=0, lastHurt=0, regen=0, wasAngry=false;
   const OUCH=['아 왜 때려!','창주는 예민해!!','아파 ㅠㅠ','너 나와','하지마라 진짜'];
+  // 분노 모드: 맞으면 때린 사람을 쫓아가서 반격
+  let angry=null, chase=null, chaseT=0, npcAtkReady=0, koStart=0, cx=0, cz=0;
+  const RAGE=['💢 너 이리 와!!','죽었어 넌','어딜 도망가','창주 화났다 😡'];
+  function calm(line){ if (!angry) return; angry=null; chase=null; av.setName('창주'); if (line) av.say(line); }
+  function showAtk(type){ const A=ATTACKS[type]; av.atk=A.dur; av.atkDur=A.dur; av.atkType=type; if (near(av)) swoosh(); }
   function hit(attacker){
-    if (av.hp<=0){ av.dead=true; koUntil=performance.now()+5000; av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`); return; }
-    const now=performance.now(); if (now-lastHurt>1500){ lastHurt=now; av.say(OUCH[Math.floor(Math.random()*OUCH.length)]); }
-    if (attacker) av.ry=Math.atan2(attacker.x-av.x, attacker.z-av.z); }
+    const nowP=performance.now();
+    if (av.hp<=0){ av.dead=true; koUntil=nowP+5000; calm(); av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`);
+      if (attacker===me){ record('npc_ko',1); if (koStart) record('npc_ko_sec', Math.max(1, (nowP-koStart)/1000)); }
+      koStart=0; return; }
+    if (!koStart) koStart=nowP;
+    lastHurt=nowP;
+    if (attacker && attacker!==av){ const was=angry && angry.id===attacker.id;
+      angry={ id: attacker.id, until: nowP+15000 }; av.setName('😡 창주');
+      if (!was){ av.say(RAGE[Math.floor(Math.random()*RAGE.length)]); av.pop('💢','#ff3b30',true,1.9); }
+      av.ry=Math.atan2(attacker.x-av.x, attacker.z-av.z); } }
+  function angryTarget(){ if (!angry) return null; if (angry.id===myId) return me; const o=others.get(angry.id); return o ? o.av : null; }
+  function updateAngry(dt){
+    const tg=angryTarget(); const nowP=performance.now();
+    if (!tg || tg.dead || nowP>angry.until || Math.hypot(tg.x-cx, tg.z-cz)>20){ const line = tg && tg.dead ? '까불고 있어 🤨' : '흥, 봐준다'; calm(line); return false; }
+    const d=Math.hypot(tg.x-cx, tg.z-cz);
+    if (d>0.95){
+      chaseT-=dt; if (chaseT<=0 || !chase){ chaseT=0.6; chase=path([cx,cz],[tg.x,tg.z]); if (chase.length>1) chase.shift(); }
+      let wp=chase[0]||[tg.x,tg.z]; if (Math.hypot(wp[0]-cx, wp[1]-cz)<0.15 && chase.length>1){ chase.shift(); wp=chase[0]; }
+      if (chase.length<=1) wp=[tg.x,tg.z];
+      const dx=wp[0]-cx, dz=wp[1]-cz, l=Math.hypot(dx,dz)||1, sp=2.5*dt; [cx,cz]=collide(cx+dx/l*Math.min(sp,l), cz+dz/l*Math.min(sp,l));
+      av.ry=Math.atan2(dx,dz); av.moving=true;
+    } else {
+      av.moving=false; av.ry=Math.atan2(tg.x-cx, tg.z-cz);
+      if (nowP>npcAtkReady){ const type=Math.random()<0.6?'punch':'kick'; npcAtkReady=nowP+1150; showAtk(type);
+        if (tg===me && !me.dead){ applyHit(me, type, av); send('npcatk',{type}); } }
+    }
+    cx+=av.kvx*dt; cz+=av.kvz*dt; [cx,cz]=collide(cx,cz);
+    av.x=cx; av.z=cz; return true;
+  }
   function update(dt, t){
     if (!route) build();
     if (av.dead){ if (performance.now()>koUntil){ av.dead=false; av.setHp(100); ox=oz=0; av.pop('부활!','#9fe8ff'); } else { av.moving=false; av.tick(dt,t); return; } }
-    if (av.hp<100 && performance.now()-lastHurt>3000){ regen+=dt*4; if (regen>=1){ av.setHp(av.hp+1); regen-=1; } } // 천천히 회복
+    if (av.hp<100 && !angry && performance.now()-lastHurt>3000){ regen+=dt*4; if (regen>=1){ av.setHp(av.hp+1); regen-=1; if (av.hp>=100) koStart=0; } } // 천천히 회복
     ox+=av.kvx*dt; oz+=av.kvz*dt; const back=Math.exp(-1.2*dt); ox*=back; oz*=back;
     const now=(Date.now()/1000) % total; if (!route[seg] || now<route[seg].t0 || now>=route[seg].t1){ seg=route.findIndex(r=>now>=r.t0&&now<r.t1); if (seg<0) seg=0; }
     const r=route[seg];
+    if (angry){ if (updateAngry(dt)){ wasAngry=true; av.tick(dt,t); return; } }
     if (r.kind==='walk' && performance.now()-lastHurt>900){ const k=(now-r.t0)/(r.t1-r.t0); av.x=r.a[0]+(r.b[0]-r.a[0])*k; av.z=r.a[1]+(r.b[1]-r.a[1])*k; av.ry=Math.atan2(r.b[0]-r.a[0], r.b[1]-r.a[1]); av.moving=true; }
     else if (r.kind==='walk'){ const k=(now-r.t0)/(r.t1-r.t0); av.x=r.a[0]+(r.b[0]-r.a[0])*k; av.z=r.a[1]+(r.b[1]-r.a[1])*k; av.moving=false; }
     else { av.x=r.x; av.z=r.z; av.moving=false;
       if (me){ const d=Math.hypot(me.x-av.x, me.z-av.z); if (d<3) av.ry=Math.atan2(me.x-av.x, me.z-av.z); }
       const key=Math.floor((Date.now()/1000)/total)*100+r.idx; if (key!==lastSay && now-r.t0<1.5 && performance.now()-lastHurt>4000){ lastSay=key; if (r.say) av.say(r.say); } }
+    if (wasAngry){ ox=cx-av.x; oz=cz-av.z; wasAngry=false; }
     if (Math.abs(ox)+Math.abs(oz)>0.01){ [av.x,av.z]=collide(av.x+ox, av.z+oz); }
+    cx=av.x; cz=av.z;
     av.tick(dt, t);
   }
-  return { av, update, hit, get route(){ if (!route) build(); return route; } };
+  return { av, update, hit, showAtk, get angry(){ return angry; }, get route(){ if (!route) build(); return route; } };
 })();
+/* ---------------- 기록 & 랭킹판 (Supabase에 저장, 방별) ---------------- */
+let firstShotAt=0, cleanStart=false, blackoutDone=false, board=null;
+function record(kind, value){ if (!SBC || !me) return; SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>setTimeout(loadBoard, 600)).catch(()=>{}); }
+async function loadBoard(){ if (!SBC) return; try { const { data, error } = await SBC.rpc('dmark_board', { p_room:ROOM }); if (!error && data){ board=data; drawBoard(); } } catch {} }
+const fmtSec = v => { v=Math.round(v); return v>=60 ? `${Math.floor(v/60)}분 ${v%60}초` : `${v}초`; };
+const BOARD_SECTIONS = [
+  ['allDrinks','🍶 역대 주량', v=>`${v}잔 (${(v/EMPTY_BOTTLES_PER).toFixed(1)}병)`],
+  ['todayDrinks','🐳 오늘의 술고래', v=>`${v}잔`],
+  ['fastBlackout','💫 최단 필름 끊김', fmtSec],
+  ['npcKo','😡 창주 KO 랭킹', v=>`${v}회`],
+  ['fastKo','⚡ 최단 창주 KO', fmtSec],
+];
+const boardCv=document.createElement('canvas'); boardCv.width=1280; boardCv.height=800; const boardTex=new THREE.CanvasTexture(boardCv); boardTex.colorSpace=THREE.SRGBColorSpace;
+{ const bw=2.7, bh=1.69; const fr=new THREE.Mesh(new THREE.BoxGeometry(bw+0.08,bh+0.08,0.04), mat('#3a2a1c')); const bz=5.57*SCALE-T/2-0.03, bx=11.25;
+  fr.position.set(bx,1.5,bz); scene.add(fr); const pl=new THREE.Mesh(new THREE.PlaneGeometry(bw,bh), new THREE.MeshBasicMaterial({ map:boardTex })); pl.rotation.y=Math.PI; pl.position.set(bx,1.5,bz-0.025); scene.add(pl); }
+function drawBoard(){
+  const g=boardCv.getContext('2d'), W=boardCv.width, H=boardCv.height; const F='"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif';
+  const bg=g.createLinearGradient(0,0,0,H); bg.addColorStop(0,'#1d2a22'); bg.addColorStop(1,'#0f1612'); g.fillStyle=bg; g.fillRect(0,0,W,H);
+  g.fillStyle='#ffcf5a'; g.font=`900 54px ${F}`; g.textAlign='center'; g.fillText('🏆 창주집 명예의 전당', W/2, 70);
+  const cells=[[40,120,385],[447,120,385],[855,120,385],[40,460,590],[650,460,590]];
+  BOARD_SECTIONS.forEach(([key,title,fmt],i)=>{ const [x,y,w]=cells[i]; g.fillStyle='rgba(255,255,255,.06)'; g.fillRect(x,y,w,320);
+    g.textAlign='left'; g.fillStyle='#fff'; g.font=`bold 34px ${F}`; g.fillText(title, x+18, y+46);
+    const rows=(board && board[key]) || []; g.font=`30px ${F}`;
+    if (!rows.length){ g.fillStyle='rgba(255,255,255,.45)'; g.fillText('아직 기록 없음', x+18, y+100); }
+    rows.slice(0,5).forEach((r,j)=>{ const yy=y+100+j*46; g.fillStyle=['#ffd54a','#d9d9d9','#e0a26b','#bbb','#bbb'][j]; g.fillText(`${j+1}. ${String(r.name).slice(0,10)}`, x+18, yy); g.textAlign='right'; g.fillStyle='#fff'; g.fillText(fmt(+r.v), x+w-18, yy); g.textAlign='left'; });
+  });
+  boardTex.needsUpdate=true;
+  const el=$('rankBody'); if (el){ el.innerHTML=''; BOARD_SECTIONS.forEach(([key,title,fmt])=>{ const h=document.createElement('b'); h.textContent=title; el.appendChild(h); const rows=(board&&board[key])||[]; const ol=document.createElement('div'); ol.className='rk';
+    if (!rows.length){ ol.textContent='아직 기록 없음'; } else rows.slice(0,5).forEach((r,j)=>{ const d=document.createElement('div'); d.textContent=`${j+1}. ${String(r.name).slice(0,12)} — ${fmt(+r.v)}`; ol.appendChild(d); }); el.appendChild(ol); }); }
+}
+drawBoard();
 /* ---------------- 술 취함: 3병부터 어질어질, 5병이면 기절 ---------------- */
 let bac = 0, faintUntil = 0; // bac = 몸에 남은 술(병). 4분에 1병씩 깸
 const drunkK = () => clamp((bac-3)/2, 0, 1);
 function faint(){
   if (!me || me.dead) return; if (me.sit>=0) standUp(); target=null; me.dead=true; faintUntil=performance.now()+10000;
   doActEffect(me,'faint',null,true); send('act',{type:'faint'}); sendMove(true);
+  if (firstShotAt && cleanStart && !blackoutDone){ blackoutDone=true; record('blackout_sec', Math.max(1,(performance.now()-firstShotAt)/1000)); }
   const f=$('faint'); f.style.pointerEvents='auto'; f.style.opacity='0.92';
 }
 function wake(){
@@ -959,6 +1034,7 @@ function updateHUD(){
 }
 $('info').onclick=()=>$('info').classList.toggle('open');
 $('helpbtn').onclick=()=>$('help').classList.toggle('show');
+$('rankbtn').onclick=()=>{ $('rank').classList.toggle('show'); loadBoard(); }; $('rankClose').onclick=()=>$('rank').classList.remove('show');
 $('invite').onclick=async ()=>{ const url = location.href.split('#')[0];
   if (navigator.share && isTouch){ try { await navigator.share({ title:'디마크 술자리', text:'디마크 거실에서 한잔 ㄱㄱ 🍶', url }); return; } catch {} }
   try { await navigator.clipboard.writeText(url); toast('링크 복사했어요. 친구한테 보내세요'); } catch { prompt('이 링크를 친구에게 보내세요', url); } };
