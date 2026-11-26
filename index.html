@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>창주집</title>
 <meta name="description" content="당산 디마크 거실에서 친구들이랑 소주 한잔">
 <meta property="og:title" content="창주집 🍶">
@@ -129,6 +132,15 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
   </div>
 </div>
 
+<script>
+// 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
+window.APP_VER='v20261126b';
+setInterval(function(){
+  fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
+    var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
+  }).catch(function(){});
+},60000);
+</script>
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
