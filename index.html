@@ -26,6 +26,9 @@ button:active{transform:scale(.96)}
 #actions{right:calc(10px + env(safe-area-inset-right));bottom:calc(64px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(2,64px);gap:8px;pointer-events:auto}
 #actions button{height:64px;width:64px;padding:4px;border-radius:18px;font-size:12px;line-height:1.1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 #actions button span{font-size:24px}
+#actions button{position:relative}
+#actions button[data-key]::after{content:attr(data-key);position:absolute;top:3px;right:4px;font-size:9px;font-weight:700;line-height:1;padding:2px 4px;border-radius:5px;background:rgba(255,255,255,.18);color:#fff;opacity:.85}
+@media (hover:none){#actions button[data-key]::after{display:none}}
 #actions #aPoop{grid-column:span 2;width:auto;flex-direction:row;gap:6px;font-size:15px;font-weight:700;background:#7a4a1e;border-color:#c98b4a;color:#fff;animation:poopPulse 1.2s ease-in-out infinite}
 @keyframes poopPulse{50%{transform:scale(1.05)}}
 #joy{left:calc(16px + env(safe-area-inset-left));bottom:calc(70px + env(safe-area-inset-bottom));width:120px;height:120px;border-radius:50%;pointer-events:auto;touch-action:none;display:none}
@@ -88,15 +91,15 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <div id="chatlog" class="hud"></div>
 <div id="joy" class="hud panel"><i></i></div>
 <div id="actions" class="hud">
-  <button id="aPoop" style="display:none"><span>💩</span>똥싸기</button>
-  <button id="aPour"><span>🍶</span>따르기</button>
-  <button id="aCheers"><span>🥂</span>짠!</button>
-  <button id="aShot"><span>🥃</span>원샷</button>
-  <button id="aSit"><span>🪑</span>앉기</button>
-  <button class="say" data-say="줴줴이야"><span>🗣️</span>줴줴이야</button>
-  <button id="aJump"><span>⬆️</span>점프</button>
-  <button id="aPunch"><span>👊</span>펀치</button>
-  <button id="aKick"><span>🦶</span>발차기</button>
+  <button id="aPoop" style="display:none" data-key="P" title="단축키 P"><span>💩</span>똥싸기</button>
+  <button id="aPour" data-key="1" title="단축키 1"><span>🍶</span>따르기</button>
+  <button id="aCheers" data-key="2" title="단축키 2"><span>🥂</span>짠!</button>
+  <button id="aShot" data-key="3" title="단축키 3"><span>🥃</span>원샷</button>
+  <button id="aSit" data-key="E" title="단축키 E"><span>🪑</span>앉기</button>
+  <button class="say" data-say="줴줴이야" data-key="4" title="단축키 4"><span>🗣️</span>줴줴이야</button>
+  <button id="aJump" data-key="SP" title="단축키 Space"><span>⬆️</span>점프</button>
+  <button id="aPunch" data-key="F" title="단축키 F"><span>👊</span>펀치</button>
+  <button id="aKick" data-key="G" title="단축키 G"><span>🦶</span>발차기</button>
 </div>
 <form id="chatbar" class="hud" autocomplete="off">
   <input id="chatin" maxlength="120" placeholder="메시지 (Enter)" enterkeyhint="send">
@@ -954,14 +957,16 @@ $('invite').onclick=async ()=>{ const url = location.href.split('#')[0];
   try { await navigator.clipboard.writeText(url); toast('링크 복사했어요. 친구한테 보내세요'); } catch { prompt('이 링크를 친구에게 보내세요', url); } };
 
 /* ---------------- 입력 ---------------- */
+// 한글 입력 상태에서도 되도록 물리 키(code) 기준
+function keyOf(e){ const c=e.code||''; if (c.startsWith('Key')) return c.slice(3).toLowerCase(); if (c.startsWith('Digit')) return c.slice(5); if (c.startsWith('Numpad') && /\d$/.test(c)) return c.slice(-1); return (e.key||'').toLowerCase(); }
 addEventListener('keydown', e=>{
   if (document.activeElement===$('chatin') || document.activeElement===$('nameIn')){ if (e.key==='Escape') document.activeElement.blur(); return; }
   if (e.key==='Enter'){ e.preventDefault(); $('chatin').focus(); return; }
   if (e.code==='Space'){ e.preventDefault(); jump(); return; }
-  const k=e.key.toLowerCase(); input.keys.add(k);
+  const k=keyOf(e); input.keys.add(k);
   if (k==='1') act('pour'); if (k==='2') act('cheers'); if (k==='3') act('shot'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop();
 });
-addEventListener('keyup', e=>input.keys.delete(e.key.toLowerCase()));
+addEventListener('keyup', e=>input.keys.delete(keyOf(e)));
 addEventListener('blur', ()=>input.keys.clear());
 
 // 조이스틱
