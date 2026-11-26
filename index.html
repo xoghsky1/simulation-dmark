@@ -92,7 +92,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
   PC: WASD/방향키 이동 · 마우스 드래그 시점 · 휠 줌 · Enter 채팅<br>
   폰: 왼쪽 조이스틱 이동 · 화면 드래그 시점 · 두 손가락 줌<br>
   바닥을 톡 누르면 거기로 걸어가요. 방석이나 소파를 누르면 가서 앉아요.<br>
-  단축키: 1 따르기 · 2 짠 · 3 원샷 · 4 줴줴이야 · Space 점프 · F 펀치 · G 발차기 · E 앉기 · P 똥싸기(변기 근처) · C 컨디션(숙취 해소)<br>HP가 0이 되면 5초 뒤 현관에서 부활
+  단축키: 1 따르기 · 2 짠 · 3 원샷 · 4 줴줴이야 · Space 점프 · F 펀치 · G 발차기 · E 앉기 · P 똥싸기(변기 근처) · C 컨디션(숙취 해소)<br>HP가 0이 되면 5초 뒤 현관에서 부활 · 5초간 안 싸우면 HP 자동 회복
 </div>
 <div id="net" class="hud panel">서버에 다시 연결하는 중…</div>
 <div id="chatlog" class="hud"></div>
@@ -584,7 +584,7 @@ class Avatar {
     const targetY = this.dead ? 0.12 : seat ? (seat.kind==='sofa' ? 0.42-0.5 : seat.kind==='toilet' ? 0.46-0.5 : 0.07-0.48) : 0;
     this.body.position.y += (targetY - this.body.position.y) * Math.min(1, dt*10);
     if (this.moving){ this.walk += dt*9; this.body.position.y += Math.abs(Math.sin(this.walk))*0.035; this.body.rotation.z = Math.sin(this.walk)*0.04; }
-    else { this.body.rotation.z = Math.sin(t*1.3+this.x)*Math.min(this.drinks,18)*0.006; }
+    else { const dr = this===me ? (drunkK()>0 ? bac*EMPTY_BOTTLES_PER : 0) : this.drinks; this.body.rotation.z = Math.sin(t*1.3+this.x)*Math.min(dr,18)*0.006; }
     this.jump=Math.max(0,this.jump-dt); const jp=this.jump>0 ? 1-this.jump/0.6 : 0;
     this.g.position.set(this.x, this.jump>0 ? 4*0.6*jp*(1-jp) : 0, this.z);
     let d=this.ry - this.g.rotation.y; d=Math.atan2(Math.sin(d),Math.cos(d)); this.g.rotation.y += d*Math.min(1,dt*12);
@@ -892,7 +892,15 @@ function wake(){
   faintUntil=0; bac=3.6; me.dead=false; me.setHp(me.hp||100); const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
   doActEffect(me,'wake',null,true); send('act',{type:'wake'}); sendMove(true); toast('으… 정신 차림. 아직 어질어질해요');
 }
+function updateRegen(dt){ // 5초 동안 안 싸우면 HP 초당 4씩 회복
+  const now=performance.now(), rdt=Math.min(1,(now-(updateRegen.last||now))/1000); updateRegen.last=now;
+  if (!me || me.dead || me.hp>=100) { hpRegen=0; return; }
+  if (now-lastCombat < 5000) return;
+  hpRegen += rdt*4; if (hpRegen>=1){ const n=Math.floor(hpRegen); hpRegen-=n; const before=me.hp; me.setHp(me.hp+n);
+    if (Math.floor(me.hp/10)!==Math.floor(before/10) || me.hp>=100){ sendMove(true); scheduleTrack(); if (me.hp>=100) me.pop('💚 HP 회복','#7dffa8'); } }
+}
 function updateDrunk(dt, t){
+  updateRegen(dt);
   if (!me) return;
   if (faintUntil){ const left=Math.ceil((faintUntil-performance.now())/1000); $('faintMsg').textContent = left>0 ? `zZZ… ${left}초 뒤 정신 차림` : ''; if (left<=0) wake(); return; }
   bac = Math.max(0, bac - dt/240);
@@ -970,11 +978,13 @@ function attack(type){
   if (best) me.ry=Math.atan2(best.av.x-me.x, best.av.z-me.z);
   const fx=Math.sin(me.ry), fz=Math.cos(me.ry); const hits=[];
   for (const [id,o] of [...others, ['npc',{av:NPC.av}]]){ if (o.av.dead) continue; const dx=o.av.x-me.x, dz=o.av.z-me.z, d=Math.hypot(dx,dz); if (d>A.range+0.25) continue; if (d>0.05 && (dx*fx+dz*fz)/d < 0.3) continue; hits.push(id); }
-  me.atk=A.dur; me.atkDur=A.dur; me.atkType=type; swoosh();
+  me.atk=A.dur; me.atkDur=A.dur; me.atkType=type; swoosh(); lastCombat=performance.now();
   send('atk', { type, ry:+me.ry.toFixed(2), hits });
   for (const id of hits) applyHit(id==='npc' ? NPC.av : others.get(id).av, type, me);
 }
+let lastCombat=0, hpRegen=0;
 function applyHit(victim, type, attacker){
+  if (victim===me || attacker===me) lastCombat=performance.now();
   const A=ATTACKS[type]; if (!A || !victim || victim.dead) return;
   const dx=victim.x-attacker.x, dz=victim.z-attacker.z, d=Math.hypot(dx,dz)||1, ux=dx/d, uz=dz/d;
   victim.flash=0.45; victim.hitT=0.35; victim.setHp(victim.hp - A.dmg);
@@ -1091,7 +1101,7 @@ const marker=new THREE.Mesh(new THREE.RingGeometry(0.12,0.17,24), new THREE.Mesh
   const enter=()=>{ const name=$('nameIn').value.trim().slice(0,12); if (!name){ $('nameIn').focus(); $('gateNote').textContent='이름을 써주세요 🙏'; return; }
     store.set('dm_name',name); store.set('dm_color',pick); audio();
     me = new Avatar(myId, name, pick); me.vx=0; me.vz=0;
-    const d = parseInt(store.get('dm_drinks_'+new Date().toDateString())||'0',10); if (d>0) me.setDrinks(d); bac = Math.min(d/EMPTY_BOTTLES_PER, 4.5);
+    const d = parseInt(store.get('dm_drinks_'+new Date().toDateString())||'0',10); if (d>0) me.setDrinks(d); bac = 0; // 새로고침하면 맨정신에서 시작
     camYaw = HOUSE.spawn.ry+Math.PI; $('gate').remove(); updateHUD(); connect();
     sys('바닥을 누르면 걸어가고, 방석을 누르면 앉아요. 🍶 따르고 🥂 짠!');
     setTimeout(()=>{ if (me.sit<0 && !target){ const i=nearestFreeSeat(me.x,me.z,true); if (i>=0) sitAt(i); } }, 2200);
@@ -1146,7 +1156,7 @@ function step(){
   if (me){
     const headY = me.sit>=0 ? (seats[me.sit].kind!=='cushion'?1.0:0.85) : 1.35;
     camTarget.set(me.x, headY, me.z);
-    const wob = me.drinks>7 ? Math.sin(t*0.9)*Math.min(me.drinks-7,12)*0.004 : 0;
+    const wob = 0; // 화면 흔들림은 취한 정도(bac)로만 → drunkK()
     const dir=new THREE.Vector3(Math.sin(camYaw)*Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw)*Math.cos(camPitch));
     let dist=camDist; camRay.set(camTarget, dir); camRay.far=camDist; const hit=camRay.intersectObjects(wallMeshes,false)[0]; if (hit) dist=Math.max(0.05, hit.distance-0.18); me.g.visible = dist > 0.8;
     const pos=camTarget.clone().addScaledVector(dir,dist); if (pos.y>HOUSE.H-0.12){ pos.y=HOUSE.H-0.12; }
