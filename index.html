@@ -142,7 +142,7 @@ const HOUSE = {
   walls: [
     [3.08,0, 5.91,0],                  // 주방 윗벽
     [5.91,0, 8.28,0], [8.28,0, 8.28,1.5], // 욕실 윗벽/오른벽
-    [5.91,1.97, 7.04,1.97], [7.57,1.97, 8.28,1.97], // 욕실 아랫벽 (문 7.04~7.57)
+    [5.91,1.97, 7.04,1.97,'glass'], [7.57,1.97, 8.28,1.97,'glass'], // 욕실 아랫벽: 투명 유리 (문 7.04~7.57)
     [6.77,0, 6.77,1.1],                // 샤워 파티션
     [8.28,1.5, 9.8,1.5], [9.8,1.5, 9.8,2.5], [9.8,3.2, 9.8,3.31], [8.08,3.31, 9.8,3.31], // 현관 (현관문 z 2.5~3.2)
     [8.08,3.31, 8.08,5.57],            // 거실 오른벽
@@ -156,11 +156,10 @@ const HOUSE = {
   ],
   solids: [ [5.37,0, 5.91,1.97], [2.45,0.84, 3.08,3.17], [2.64,7.35, 3.2,8.11] ],
   // 거실 쪽 여닫이 유리문 (진한 틴트 유리, 사람이 다가가면 열림): x 벽선, z0~z1, 문짝 수
-  doors: [ { z:5.57, x0:3.3, x1:5.2, n:2 } ],  // 거실 아래쪽 방 // 기둥·붙박이장·덕트
+  doors: [ { z:5.57, x0:3.3, x1:5.2, n:2 },  // 거실 아래쪽 옷방 (틴트 유리)
+           { z:1.97, x0:7.04, x1:7.57, n:1, clear:true, swing:-1 } ],  // 욕실 (투명 유리, 다 보임) // 기둥·붙박이장·덕트
   // 창문: 벽선 위 [x1,z1,x2,z2, 아래높이, 위높이]
   windows: [
-    [3.24,0, 4.9,0, 1.0,2.1],       // 주방 창
-    [5.77,5.57, 7.77,5.57, 0.3,2.15],// 거실 큰 창 (야경)
     [0.3,1.75, 1.3,1.75, 0.9,2.0],  // 침실 위쪽 창
     [0,1.9, 0,3.0, 0.9,2.0],
     [3.37,8.11, 5.1,8.11, 0.8,2.1], // 옷방 창
@@ -246,12 +245,15 @@ const wallMeshes = [];
 const wallMat = mat('#b3afa9');
 const T = 0.12;
 function addBox(x0,z0,x1,z1){ colliders.push({x0:Math.min(x0,x1),z0:Math.min(z0,z1),x1:Math.max(x0,x1),z1:Math.max(z0,z1)}); }
+const clearGlass = new THREE.MeshPhongMaterial({ color:'#e8f6ff', transparent:true, opacity:.14, shininess:120, specular:'#fff', depthWrite:false });
 const railMat = new THREE.MeshPhongMaterial({color:'#bfe0ff', transparent:true, opacity:.25});
-for (const [x1,z1,x2,z2,hh] of HOUSE.walls){
+for (let [x1,z1,x2,z2,hh] of HOUSE.walls){
+  const glassWall = hh==='glass'; if (glassWall) hh=0;
   const h = hh || HOUSE.H; const len = Math.hypot(x2-x1,z2-z1); const horiz = Math.abs(z2-z1) < 1e-6;
   const geo = new THREE.BoxGeometry(horiz?len+T:T, h, horiz?T:len+T);
-  const m = new THREE.Mesh(geo, hh ? railMat : wallMat); m.position.set((x1+x2)/2, h/2, (z1+z2)/2); scene.add(m); if (!hh) wallMeshes.push(m);
+  const m = new THREE.Mesh(geo, glassWall ? clearGlass : hh ? railMat : wallMat); m.position.set((x1+x2)/2, h/2, (z1+z2)/2); scene.add(m); if (!hh && !glassWall) wallMeshes.push(m);
   if (hh){ const top=new THREE.Mesh(new THREE.BoxGeometry(horiz?len+T:T+0.02,0.05,horiz?T+0.02:len+T), mat('#555')); top.position.set(m.position.x,h,m.position.z); scene.add(top); }
+  else if (glassWall){ const fr=mat('#9aa3a8'); for (const yy of [0.02, h-0.02]){ const b=new THREE.Mesh(new THREE.BoxGeometry(horiz?len+T:T, 0.04, horiz?T:len+T), fr); b.position.set(m.position.x,yy,m.position.z); scene.add(b); } }
   else { const b=new THREE.Mesh(new THREE.BoxGeometry((horiz?len+T:T)+0.02,0.08,(horiz?T:len+T)+0.02), mat('#8a6a4f')); b.position.set(m.position.x,0.04,m.position.z); scene.add(b); }
   if (horiz) addBox(Math.min(x1,x2)-T/2, z1-T/2, Math.max(x1,x2)+T/2, z1+T/2); else addBox(x1-T/2, Math.min(z1,z2)-T/2, x1+T/2, Math.max(z1,z2)+T/2);
 }
@@ -260,13 +262,13 @@ for (const [x0,z0,x1,z1] of HOUSE.solids){ const m=new THREE.Mesh(new THREE.BoxG
 /* 여닫이 유리문 */
 const doorObjs = [];
 { const glassM = new THREE.MeshPhongMaterial({ color:'#1b2226', transparent:true, opacity:.62, shininess:80, specular:'#556' }); const frameM = mat('#2a2826');
-  for (const d of HOUSE.doors){ const w=(d.x1-d.x0)/d.n, h=HOUSE.H-0.05;
+  for (const d of HOUSE.doors){ const w=(d.x1-d.x0)/d.n, h=HOUSE.H-0.05; const gM = d.clear ? clearGlass : glassM; const sw = d.swing || 1;
     for (let i=0;i<d.n;i++){ const atStart = (i===0); const hx = atStart ? d.x0 : d.x1; const dir = atStart ? 1 : -1;
       const pivot=new THREE.Group(); pivot.position.set(hx, 0, d.z); scene.add(pivot);
-      const pane=new THREE.Mesh(new THREE.BoxGeometry(w-0.06,h-0.06,0.03), glassM); pane.position.set(dir*w/2,h/2,0); pivot.add(pane);
+      const pane=new THREE.Mesh(new THREE.BoxGeometry(w-0.06,h-0.06,0.03), gM); pane.position.set(dir*w/2,h/2,0); pivot.add(pane);
       for (const [bw,bh,bd,y,x] of [[w,0.04,0.05,h-0.02,dir*w/2],[w,0.04,0.05,0.02,dir*w/2],[0.04,h,0.05,h/2,dir*0.02],[0.04,h,0.05,h/2,dir*(w-0.02)]]){ const f=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd),frameM); f.position.set(x,y,0); pivot.add(f); }
       const handle=new THREE.Mesh(new THREE.BoxGeometry(0.025,0.35,0.06), mat('#888')); handle.position.set(dir*(w-0.1),1.0,-0.05); pivot.add(handle);
-      doorObjs.push({ pivot, sign: dir, cx: hx+dir*w/2, cz: d.z, ang: 0 }); }
+      doorObjs.push({ pivot, sign: dir*sw, cx: hx+dir*w/2, cz: d.z, ang: 0 }); }
     const top=new THREE.Mesh(new THREE.BoxGeometry(d.x1-d.x0,0.05,0.14), frameM); top.position.set((d.x0+d.x1)/2, HOUSE.H-0.025, d.z); scene.add(top); }
 }
 function updateDoors(dt){
