@@ -701,7 +701,7 @@ function connect(){
   channel.on('broadcast', { event:'atk' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); const A=ATTACKS[p.type]; if (!o || !A || o.av.dead) return;
     o.av.atk=A.dur; o.av.atkDur=A.dur; o.av.atkType=p.type; o.av.ry=num(p.ry,o.av.ry); if (near(o.av)) swoosh();
     const hits = Array.isArray(p.hits) ? p.hits.slice(0,20).filter(h=>typeof h==='string' && h!==p.id) : [];
-    for (const h of hits){ if (h===myId) applyHit(me, p.type, o.av); else { const v=others.get(h); if (v) applyHit(v.av, p.type, o.av); } } });
+    for (const h of hits){ if (h===myId) applyHit(me, p.type, o.av); else if (h==='npc') applyHit(NPC.av, p.type, o.av); else { const v=others.get(h); if (v) applyHit(v.av, p.type, o.av); } } });
   channel.subscribe(async (status)=>{
     if (status==='SUBSCRIBED'){ online=true; $('net').style.display='none'; if (!joinedAt) joinedAt=performance.now(); lastTrack=performance.now(); try { await channel.track(myState()); } catch {} send('mv',{x:me.x,z:me.z,ry:me.ry,vx:0,vz:0,sit:me.sit}); updateHUD();
       setTimeout(()=>{ if (others.size+1 > MAX_PLAYERS) toast(`지금 ${others.size+1}명이라 좀 버벅일 수 있어요`); }, 2000); }
@@ -770,18 +770,28 @@ const NPC = (()=>{
       route.push({ kind:'wait', t0:t, t1:t+st.wait, x:ps[0][0], z:ps[0][1], say:st.say, idx:i }); t+=st.wait;
       for (let k=0;k<ps.length-1;k++){ const a=ps[k], b=ps[k+1], d=Math.hypot(b[0]-a[0],b[1]-a[1]); if (d<1e-3) continue; route.push({ kind:'walk', t0:t, t1:t+d/SPEED, a, b }); t+=d/SPEED; } });
     total=t; }
-  let lastSay=-1, seg=0;
+  let lastSay=-1, seg=0, ox=0, oz=0, koUntil=0, lastHurt=0, regen=0;
+  const OUCH=['아 왜 때려!','창주는 예민해!!','아파 ㅠㅠ','너 나와','하지마라 진짜'];
+  function hit(attacker){
+    if (av.hp<=0){ av.dead=true; koUntil=performance.now()+5000; av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`); return; }
+    const now=performance.now(); if (now-lastHurt>1500){ lastHurt=now; av.say(OUCH[Math.floor(Math.random()*OUCH.length)]); }
+    if (attacker) av.ry=Math.atan2(attacker.x-av.x, attacker.z-av.z); }
   function update(dt, t){
     if (!route) build();
+    if (av.dead){ if (performance.now()>koUntil){ av.dead=false; av.setHp(100); ox=oz=0; av.pop('부활!','#9fe8ff'); } else { av.moving=false; av.tick(dt,t); return; } }
+    if (av.hp<100 && performance.now()-lastHurt>3000){ regen+=dt*4; if (regen>=1){ av.setHp(av.hp+1); regen-=1; } } // 천천히 회복
+    ox+=av.kvx*dt; oz+=av.kvz*dt; const back=Math.exp(-1.2*dt); ox*=back; oz*=back;
     const now=(Date.now()/1000) % total; if (!route[seg] || now<route[seg].t0 || now>=route[seg].t1){ seg=route.findIndex(r=>now>=r.t0&&now<r.t1); if (seg<0) seg=0; }
     const r=route[seg];
-    if (r.kind==='walk'){ const k=(now-r.t0)/(r.t1-r.t0); av.x=r.a[0]+(r.b[0]-r.a[0])*k; av.z=r.a[1]+(r.b[1]-r.a[1])*k; av.ry=Math.atan2(r.b[0]-r.a[0], r.b[1]-r.a[1]); av.moving=true; }
+    if (r.kind==='walk' && performance.now()-lastHurt>900){ const k=(now-r.t0)/(r.t1-r.t0); av.x=r.a[0]+(r.b[0]-r.a[0])*k; av.z=r.a[1]+(r.b[1]-r.a[1])*k; av.ry=Math.atan2(r.b[0]-r.a[0], r.b[1]-r.a[1]); av.moving=true; }
+    else if (r.kind==='walk'){ const k=(now-r.t0)/(r.t1-r.t0); av.x=r.a[0]+(r.b[0]-r.a[0])*k; av.z=r.a[1]+(r.b[1]-r.a[1])*k; av.moving=false; }
     else { av.x=r.x; av.z=r.z; av.moving=false;
       if (me){ const d=Math.hypot(me.x-av.x, me.z-av.z); if (d<3) av.ry=Math.atan2(me.x-av.x, me.z-av.z); }
-      const key=Math.floor((Date.now()/1000)/total)*100+r.idx; if (key!==lastSay && now-r.t0<1.5){ lastSay=key; av.say(r.say); } }
+      const key=Math.floor((Date.now()/1000)/total)*100+r.idx; if (key!==lastSay && now-r.t0<1.5 && performance.now()-lastHurt>4000){ lastSay=key; av.say(r.say); } }
+    if (Math.abs(ox)+Math.abs(oz)>0.01){ [av.x,av.z]=collide(av.x+ox, av.z+oz); }
     av.tick(dt, t);
   }
-  return { av, update, get route(){ if (!route) build(); return route; } };
+  return { av, update, hit, get route(){ if (!route) build(); return route; } };
 })();
 /* ---------------- 💩 똥싸기 (변기 근처에서만) ---------------- */
 let wantPoop=false, poopCd=0, poopBusy=0;
@@ -840,13 +850,13 @@ let atkReady = 0, koTimer = null;
 function attack(type){
   const A=ATTACKS[type]; if (!me || me.dead || !A) return; const now=performance.now(); if (now<atkReady) return; atkReady=now+A.cd*1000; audio();
   if (me.sit>=0) standUp(); target=null;
-  let best=null, bd=A.range+0.7; for (const o of others.values()){ if (o.av.dead) continue; const d=Math.hypot(o.av.x-me.x,o.av.z-me.z); if (d<bd){ bd=d; best=o; } }
+  let best=null, bd=A.range+0.7; for (const o of [...others.values(), {av:NPC.av}]){ if (o.av.dead) continue; const d=Math.hypot(o.av.x-me.x,o.av.z-me.z); if (d<bd){ bd=d; best=o; } }
   if (best) me.ry=Math.atan2(best.av.x-me.x, best.av.z-me.z);
   const fx=Math.sin(me.ry), fz=Math.cos(me.ry); const hits=[];
-  for (const [id,o] of others){ if (o.av.dead) continue; const dx=o.av.x-me.x, dz=o.av.z-me.z, d=Math.hypot(dx,dz); if (d>A.range+0.25) continue; if (d>0.05 && (dx*fx+dz*fz)/d < 0.3) continue; hits.push(id); }
+  for (const [id,o] of [...others, ['npc',{av:NPC.av}]]){ if (o.av.dead) continue; const dx=o.av.x-me.x, dz=o.av.z-me.z, d=Math.hypot(dx,dz); if (d>A.range+0.25) continue; if (d>0.05 && (dx*fx+dz*fz)/d < 0.3) continue; hits.push(id); }
   me.atk=A.dur; me.atkDur=A.dur; me.atkType=type; swoosh();
   send('atk', { type, ry:+me.ry.toFixed(2), hits });
-  for (const id of hits) applyHit(others.get(id).av, type, me);
+  for (const id of hits) applyHit(id==='npc' ? NPC.av : others.get(id).av, type, me);
 }
 function applyHit(victim, type, attacker){
   const A=ATTACKS[type]; if (!A || !victim || victim.dead) return;
@@ -862,7 +872,7 @@ function applyHit(victim, type, attacker){
     if (me.hp<=0) die(attacker); else setTimeout(()=>sendMove(true), 320); scheduleTrack();
   } else {
     const o=others.get(victim.id); if (o){ o.net=null; o.target=null; }
-    if (victim.hp<=0) victim.dead=true;
+    if (victim===NPC.av) NPC.hit(attacker); else if (victim.hp<=0) victim.dead=true;
   }
 }
 function die(attacker){
