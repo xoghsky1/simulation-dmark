@@ -393,10 +393,7 @@ const faceTo = (x,z) => Math.atan2(TB.x-x, TB.z-z);
   { const i=seats.length; const x=(cx0+cx1)/2, z=sz1-0.45; seats.push({x,z,ry:Math.PI,kind:'sofa'}); const c=box(cx1-cx0-0.05,0.12,0.6,'#f3efe6',x,0.45,z-0.05); c.userData.seat=i; seatMeshes.push(c); }
   for (const [dz,rot] of [[-0.55,0.2],[0.3,-0.15]]){ const pl=box(0.14,0.38,0.5,'#f6f3ec',sx-0.17,0.68,TB.z+dz); pl.rotation.z=rot; }
 }
-// 흰 타원 테이블 + 진회색 A자 다리 (사진 참고, 주방 쪽)
-{ const ox=3.08*SCALE+T/2+0.76, oz=2.0*SCALE+0.75; // 왼쪽 벽에 밀착 const top=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.04,40), mat('#f2f0ec')); top.scale.set(1.5,1,0.8); top.position.set(ox,0.74,oz); scene.add(top); addBox(ox-0.72,oz-0.38,ox+0.72,oz+0.38);
-  for (const sx of [-1,1]) for (const sz of [-1,1]){ const l=box(0.04,0.78,0.04,'#3a3d3f',ox+sx*0.45,0.37,oz+sz*0.18); l.rotation.z=sx*0.18; l.rotation.x=-sz*0.12; }
-  box(0.5,0.38,0.06,'#fff',ox+0.35,0.95,oz-0.15); }
+// (흰 타원 테이블 제거)
 // 벽걸이 TV (거실 오른벽, 예전 소파 자리)
 const tvCanvas=document.createElement('canvas'); tvCanvas.width=1024; tvCanvas.height=576;
 const tvTex=new THREE.CanvasTexture(tvCanvas); tvTex.colorSpace=THREE.SRGBColorSpace;
