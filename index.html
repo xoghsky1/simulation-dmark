@@ -146,7 +146,6 @@ const HOUSE = {
     [3.08,0, 5.91,0],                  // 주방 윗벽
     [5.91,0, 8.28,0], [8.28,0, 8.28,1.5], // 욕실 윗벽/오른벽
     [5.91,1.97, 7.04,1.97,'glass'], [7.57,1.97, 8.28,1.97,'glass'], // 욕실 아랫벽: 투명 유리 (문 7.04~7.57)
-    [6.77,0, 6.77,1.1],                // 샤워 파티션
     [8.28,1.5, 9.8,1.5], [9.8,1.5, 9.8,2.5], [9.8,3.2, 9.8,3.31], [8.08,3.31, 9.8,3.31], // 현관 (현관문 z 2.5~3.2)
     [8.08,3.31, 8.08,5.57],            // 거실 오른벽
     [0,5.57, 1.9,5.57], [2.6,5.57, 3.3,5.57], [5.2,5.57, 8.08,5.57], // 침실 아랫벽 (테라스 문 1.9~2.6) / 거실 아랫벽 (옷방 유리문 3.3~5.2)
@@ -159,7 +158,7 @@ const HOUSE = {
   ],
   solids: [ [5.37,0, 5.91,1.97], [2.45,0.84, 3.08,3.17], [2.64,7.35, 3.2,8.11] ],
   // 거실 쪽 여닫이 유리문 (진한 틴트 유리, 사람이 다가가면 열림): x 벽선, z0~z1, 문짝 수
-  doors: [ { z:5.57, x0:3.3, x1:5.2, n:2 },  // 거실 아래쪽 옷방 (틴트 유리)
+  doors: [ { z:5.57, x0:3.3, x1:5.2, n:2, slide:true },  // 거실 아래쪽 옷방 (틴트 유리, 왼쪽으로 슬라이딩)
            { z:1.97, x0:7.04, x1:7.57, n:1, clear:true, swing:-1 } ],  // 욕실 (투명 유리, 다 보임) // 기둥·붙박이장·덕트
   // 창문: 벽선 위 [x1,z1,x2,z2, 아래높이, 위높이]
   windows: [
@@ -263,18 +262,19 @@ for (const [x0,z0,x1,z1] of HOUSE.solids){ const m=new THREE.Mesh(new THREE.BoxG
 const doorObjs = [];
 { const glassM = new THREE.MeshPhongMaterial({ color:'#1b2226', transparent:true, opacity:.62, shininess:80, specular:'#556' }); const frameM = mat('#2a2826');
   for (const d of HOUSE.doors){ const w=(d.x1-d.x0)/d.n, h=HOUSE.H-0.05; const gM = d.clear ? clearGlass : glassM; const sw = d.swing || 1;
-    for (let i=0;i<d.n;i++){ const atStart = (i===0); const hx = atStart ? d.x0 : d.x1; const dir = atStart ? 1 : -1;
-      const pivot=new THREE.Group(); pivot.position.set(hx, 0, d.z); scene.add(pivot);
+    for (let i=0;i<d.n;i++){ const atStart = d.slide || (i===0); const hx = d.slide ? d.x0+i*w : atStart ? d.x0 : d.x1; const dir = atStart ? 1 : -1;
+      const pivot=new THREE.Group(); pivot.position.set(hx, 0, d.z + (d.slide ? (i%2 ? 0.035 : -0.035) : 0)); scene.add(pivot);
       const pane=new THREE.Mesh(new THREE.BoxGeometry(w-0.06,h-0.06,0.03), gM); pane.position.set(dir*w/2,h/2,0); pivot.add(pane);
       for (const [bw,bh,bd,y,x] of [[w,0.04,0.05,h-0.02,dir*w/2],[w,0.04,0.05,0.02,dir*w/2],[0.04,h,0.05,h/2,dir*0.02],[0.04,h,0.05,h/2,dir*(w-0.02)]]){ const f=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd),frameM); f.position.set(x,y,0); pivot.add(f); }
       const handle=new THREE.Mesh(new THREE.BoxGeometry(0.025,0.35,0.06), mat('#888')); handle.position.set(dir*(w-0.1),1.0,-0.05); pivot.add(handle);
-      doorObjs.push({ pivot, sign: dir*sw, cx: hx+dir*w/2, cz: d.z, ang: 0 }); }
+      doorObjs.push({ pivot, sign: dir*sw, cx: d.slide ? (d.x0+d.x1)/2 : hx+dir*w/2, cz: d.z, ang: 0, slide: d.slide ? { from: hx, to: d.x0 } : null }); }
+    if (d.slide){ const rail=new THREE.Mesh(new THREE.BoxGeometry(d.x1-d.x0,0.015,0.12), frameM); rail.position.set((d.x0+d.x1)/2,0.008,d.z); scene.add(rail); }
     const top=new THREE.Mesh(new THREE.BoxGeometry(d.x1-d.x0,0.05,0.14), frameM); top.position.set((d.x0+d.x1)/2, HOUSE.H-0.025, d.z); scene.add(top); }
 }
 function updateDoors(dt){
   const people=[]; if (me) people.push(me); for (const o of others.values()) people.push(o.av);
   for (const d of doorObjs){ const near = people.some(a=>Math.hypot(a.x-d.cx, a.z-d.cz) < 1.6); const tgt = near ? 1.5 : 0;
-    d.ang += (tgt-d.ang)*Math.min(1,dt*5); d.pivot.rotation.y = d.sign*d.ang; }
+    d.ang += (tgt-d.ang)*Math.min(1,dt*5); if (d.slide) d.pivot.position.x = d.slide.from + (d.slide.to-d.slide.from)*d.ang/1.5; else d.pivot.rotation.y = d.sign*d.ang; }
 }
 
 /* 창밖 당산 야경 */
@@ -411,11 +411,24 @@ ANC={x:9.8,z:1.5};
 box(1.3,1.0,0.32,'#d6cbbb',9.05,0.5,1.68,true);
 // 욕실: 세면대, 변기, 샤워
 ANC={x:8.28,z:0};
-box(0.5,0.85,0.42,'#ffffff',7.98,0.425,0.6,true); /* 변기는 아래 '럭셔리 변기'에서 */
+/* 세면대 자리 → 샤워기, 변기는 아래 '럭셔리 변기'에서 */
+{ ANC=null; const wx=8.28*SCALE-T/2, sz=0.75;
+  const chrome=new THREE.MeshPhongMaterial({ color:'#d9dee2', shininess:140, specular:'#ffffff' });
+  const add=(geo,x,y,z)=>{ const o=new THREE.Mesh(geo,chrome); o.position.set(x,y,z); scene.add(o); return o; };
+  add(new THREE.CylinderGeometry(0.018,0.018,1.3,12), wx-0.05, 1.45, sz);                       // 세로 파이프
+  const arm=add(new THREE.CylinderGeometry(0.016,0.016,0.32,12), wx-0.2, 2.1, sz); arm.rotation.z=Math.PI/2; // 팔
+  add(new THREE.CylinderGeometry(0.15,0.15,0.025,32), wx-0.36, 2.08, sz);                        // 레인 샤워 헤드
+  add(new THREE.CylinderGeometry(0.06,0.06,0.04,20).rotateZ(Math.PI/2), wx-0.05, 1.05, sz);       // 수전
+  add(new THREE.BoxGeometry(0.03,0.14,0.05), wx-0.09, 1.08, sz);                                // 레버
+  const hh=add(new THREE.CylinderGeometry(0.022,0.03,0.22,12), wx-0.07, 1.3, sz+0.12); hh.rotation.x=0.25; // 핸드샤워
+  add(new THREE.CylinderGeometry(0.05,0.05,0.035,16), wx-0.06, 1.42, sz+0.15);
+  const dr=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.008,0.08), mat('#7c858c')); dr.position.set(wx-0.45,0.006,sz); scene.add(dr); // 배수구
+  const drop=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.2,2.0,20,1,true), new THREE.MeshBasicMaterial({ color:'#bfe9ff', transparent:true, opacity:0.08, depthWrite:false, side:THREE.DoubleSide })); drop.position.set(wx-0.36,1.05,sz); scene.add(drop); // 물줄기
+}
+ANC={x:8.28,z:0};
 ANC={x:5.91,z:0};
-cyl(0.12,0.12,0.02,'#c0c6ca',6.3,2.2,0.5,16);
 // 럭셔리 변기 (금빛 시트 + 하단 LED) — 앉을 수 있음, 가까이 가면 💩 버튼
-const TOILET = { x: 8.28*SCALE - T/2 - 0.5, z: 1.4, seat: -1 };
+const TOILET = { x: 8.28*SCALE - T/2 - 0.5, z: 2.45, seat: -1 };
 { ANC=null; const tx=TOILET.x, tz=TOILET.z;
   const porc = new THREE.MeshPhongMaterial({ color:'#ffffff', shininess:110, specular:'#cfd8e0' });
   const gold = new THREE.MeshPhongMaterial({ color:'#d6a93e', shininess:95, specular:'#fff3c4', emissive:'#2a1d00' });
