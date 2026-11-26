@@ -161,6 +161,13 @@ const HOUSE = {
   table: { x: 5.35, z: 3.95, w: 1.5, d: 0.85, h: 0.36 },  // 거실 좌식 술상
   spawn: { x: 9.0, z: 2.85, ry: -Math.PI/2 },               // 현관에서 시작
 };
+// 집 전체 확대 배율 (1 = 평면도 실측). 가구 크기는 그대로, 방만 넓어짐
+const SCALE = 1.3;
+(function scaleHouse(S){
+  HOUSE.W*=S; HOUSE.D*=S; HOUSE.H=2.5;
+  for (const a of [HOUSE.floors, HOUSE.walls, HOUSE.solids, HOUSE.windows]) for (const r of a) for (let i=0;i<4;i++) r[i]*=S;
+  HOUSE.table.x*=S; HOUSE.table.z*=S; HOUSE.spawn.x*=S; HOUSE.spawn.z*=S;
+})(SCALE);
 const MAX_PLAYERS = 20;
 const SUPABASE_URL = 'https://jzouvtpwibgmlenwbial.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_QmjuXAtq6ghgQ-7MCawKuQ_xiR5Icl4';
@@ -194,11 +201,11 @@ function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false)
 addEventListener('resize', resize); resize();
 
 scene.add(new THREE.HemisphereLight('#ffe9d0', '#3b2a20', 0.9));
-const lamp = new THREE.PointLight('#ffc98a', 18, 9, 1.6); lamp.position.set(HOUSE.table.x, 2.2, HOUSE.table.z); scene.add(lamp);
-const lamp2 = new THREE.PointLight('#ffe2bd', 6, 6, 1.8); lamp2.position.set(4.2, 2.2, 1.0); scene.add(lamp2);
-const lamp3 = new THREE.PointLight('#fff1dc', 5, 6, 1.8); lamp3.position.set(1.5, 2.2, 4.3); scene.add(lamp3);
-const lamp4 = new THREE.PointLight('#fff1dc', 5, 6, 1.8); lamp4.position.set(4.1, 2.2, 6.8); scene.add(lamp4);
-const lamp5 = new THREE.PointLight('#fff4e6', 3, 4, 1.8); lamp5.position.set(8.6, 2.2, 2.4); scene.add(lamp5);
+const lamp = new THREE.PointLight('#ffc98a', 18, 9, 1.6); lamp.position.set(HOUSE.table.x, 2.3, HOUSE.table.z); scene.add(lamp);
+const lamp2 = new THREE.PointLight('#ffe2bd', 6, 6, 1.8); lamp2.position.set(4.2*SCALE, 2.3, 1.0*SCALE); scene.add(lamp2);
+const lamp3 = new THREE.PointLight('#fff1dc', 5, 6, 1.8); lamp3.position.set(1.5*SCALE, 2.3, 4.3*SCALE); scene.add(lamp3);
+const lamp4 = new THREE.PointLight('#fff1dc', 5, 6, 1.8); lamp4.position.set(4.1*SCALE, 2.3, 6.8*SCALE); scene.add(lamp4);
+const lamp5 = new THREE.PointLight('#fff4e6', 3, 4, 1.8); lamp5.position.set(8.6*SCALE, 2.3, 2.4*SCALE); scene.add(lamp5);
 
 function canvasTex(w,h,draw){ const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d'); draw(g,w,h); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=4; return t; }
 const mat = (color, opts={}) => new THREE.MeshLambertMaterial({ color, ...opts });
@@ -269,15 +276,20 @@ for (const [x1,z1,x2,z2,y0,y1] of HOUSE.windows){
 
 /* 가구 */
 const seatMeshes = [];
-function box(w,h,d,color,x,y,z,collide=false,parent=scene){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat(color)); m.position.set(x,y,z); parent.add(m); if(collide) addBox(x-w/2,z-d/2,x+w/2,z+d/2); return m; }
-function cyl(rt,rb,h,color,x,y,z,seg=16,parent=scene,m2){ const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg), m2||mat(color)); m.position.set(x,y,z); parent.add(m); return m; }
+// ANC: 가구 묶음 기준점(평면도 좌표). 기준점만 SCALE 배율로 옮기고 가구 모양/간격은 그대로 유지
+let ANC = null;
+const AX = x => ANC ? ANC.x*SCALE + (x-ANC.x) : x;
+const AZ = z => ANC ? ANC.z*SCALE + (z-ANC.z) : z;
+function addBoxA(x0,z0,x1,z1){ addBox(AX(x0),AZ(z0),AX(x1),AZ(z1)); }
+function box(w,h,d,color,x,y,z,collide=false,parent=scene){ if (parent===scene){ x=AX(x); z=AZ(z); } const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat(color)); m.position.set(x,y,z); parent.add(m); if(collide) addBox(x-w/2,z-d/2,x+w/2,z+d/2); return m; }
+function cyl(rt,rb,h,color,x,y,z,seg=16,parent=scene,m2){ if (parent===scene){ x=AX(x); z=AZ(z); } const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg), m2||mat(color)); m.position.set(x,y,z); parent.add(m); return m; }
 
 // 술상
 const TB = HOUSE.table;
 box(TB.w, 0.05, TB.d, '#7a5235', TB.x, TB.h, TB.z, true);
 for (const sx of [-1,1]) for (const sz of [-1,1]) box(0.05, TB.h-0.02, 0.05, '#5e3e28', TB.x+sx*(TB.w/2-0.1), (TB.h-0.02)/2, TB.z+sz*(TB.d/2-0.1));
-{ const m=new THREE.Mesh(new THREE.PlaneGeometry(3.2,2.4), mat('#7d3b36')); m.rotation.x=-Math.PI/2; m.position.set(TB.x,0.004,TB.z); scene.add(m);
-  const m2=new THREE.Mesh(new THREE.PlaneGeometry(3.0,2.2), mat('#a35a4a')); m2.rotation.x=-Math.PI/2; m2.position.set(TB.x,0.006,TB.z); scene.add(m2); }
+{ const m=new THREE.Mesh(new THREE.PlaneGeometry(3.8,2.8), mat('#7d3b36')); m.rotation.x=-Math.PI/2; m.position.set(TB.x,0.004,TB.z); scene.add(m);
+  const m2=new THREE.Mesh(new THREE.PlaneGeometry(3.6,2.6), mat('#a35a4a')); m2.rotation.x=-Math.PI/2; m2.position.set(TB.x,0.006,TB.z); scene.add(m2); }
 
 // 소주병 (초록병)
 const labelTex = canvasTex(256,128,(g,w,h)=>{ g.fillStyle='#f4f7f2'; g.fillRect(0,0,w,h); g.fillStyle='#1d6b3a'; g.fillRect(0,h*.72,w,h*.28); g.fillStyle='#14305a'; g.font='bold 54px "Apple SD Gothic Neo","Noto Sans KR",sans-serif'; g.textAlign='center'; g.fillText('소 주',w/2,h*.6); });
@@ -290,7 +302,7 @@ function makeBottle(){ const g=new THREE.Group();
   const l=new THREE.Mesh(new THREE.CylinderGeometry(0.037,0.037,0.07,16,1,true), new THREE.MeshLambertMaterial({map:labelTex})); l.position.y=0.09; g.add(l);
   return g; }
 const tableTop = TB.h + 0.025;
-// 볼링핀 배치 10병 (4-3-2-1 삼각형, 머리핀이 소파 쪽)
+// 볼링핀 배치 10병 (4-3-2-1 삼각형, 4병 줄이 소파 쪽)
 for (let k=0;k<4;k++) for (let j=0;j<=k;j++){ const b=makeBottle(); b.position.set(TB.x-0.12-k*0.085, tableTop, TB.z+(j-k/2)*0.095); scene.add(b); }
 function plate(x,z,r=0.13){ cyl(r,r*0.8,0.02,'#f2f2ee',x,tableTop+0.01,z,24); }
 plate(TB.x+0.3,TB.z-0.13,0.16);
@@ -311,50 +323,65 @@ function addSeat(x,z,ry,kind='cushion'){
 const faceTo = (x,z) => Math.atan2(TB.x-x, TB.z-z);
 { const cx=TB.x, cz=TB.z, hw=TB.w/2+0.38, hd=TB.d/2+0.38;
   for (const dx of [-0.45,0.05,0.5]) { addSeat(cx+dx, cz-hd, 0); addSeat(cx+dx, cz+hd, Math.PI); }
-  for (const dz of [-0.2,0.25]) { addSeat(cx-hw, cz+dz, Math.PI/2); addSeat(cx+hw, cz+dz, -Math.PI/2); }
-  for (const [x,z] of [[cx-1.4,cz-0.95],[cx+1.3,cz-1.0],[cx-1.4,cz+1.0],[cx-0.2,cz-1.3],[cx+0.6,cz+1.25]]) addSeat(x,z,faceTo(x,z));
+  for (const dz of [-0.2,0.25]) addSeat(cx+hw, cz+dz, -Math.PI/2);
+  for (const [x,z] of [[cx+1.45,cz-0.95],[cx+1.45,cz+0.95],[cx-0.25,cz-1.35],[cx+0.6,cz-1.35],[cx-0.25,cz+1.35],[cx+0.6,cz+1.35]]) addSeat(x,z,faceTo(x,z));
 }
-// 소파 (거실 오른벽, 술상 바라봄)
-{ const sx=7.62, sz0=3.5, sz1=5.4;
+// 소파 (술상 4병 줄 앞, TV 바라봄)
+{ const sx=TB.x-TB.w/2-0.95, sz0=TB.z-1.05, sz1=TB.z+1.05;
   box(0.8,0.4,sz1-sz0,'#55606e',sx,0.2,(sz0+sz1)/2,true);
-  box(0.2,0.75,sz1-sz0,'#4a5361',sx+0.32,0.45,(sz0+sz1)/2);
+  box(0.2,0.75,sz1-sz0,'#4a5361',sx-0.32,0.45,(sz0+sz1)/2);
   box(0.8,0.55,0.18,'#4a5361',sx,0.35,sz0); box(0.8,0.55,0.18,'#4a5361',sx,0.35,sz1);
-  for (const z of [3.9,4.45,5.0]){ const i=seats.length; seats.push({x:sx-0.05,z,ry:-Math.PI/2,kind:'sofa'});
-    const c=box(0.55,0.1,0.55,'#6a7686',sx-0.05,0.44,z); c.userData.seat=i; seatMeshes.push(c); }
+  for (const dz of [-0.6,0,0.6]){ const i=seats.length; const z=TB.z+dz; seats.push({x:sx+0.05,z,ry:Math.PI/2,kind:'sofa'});
+    const c=box(0.55,0.1,0.55,'#6a7686',sx+0.05,0.44,z); c.userData.seat=i; seatMeshes.push(c); }
 }
-// TV (거실 왼벽, 침실1 문 위쪽)
+// 벽걸이 TV (거실 오른벽, 예전 소파 자리)
 const tvTex = canvasTex(512,288,(g,w,h)=>{ const gr=g.createLinearGradient(0,0,w,h); gr.addColorStop(0,'#14324a'); gr.addColorStop(1,'#2b1640'); g.fillStyle=gr; g.fillRect(0,0,w,h); g.fillStyle='#fff'; g.font='bold 46px "Apple SD Gothic Neo","Noto Sans KR",sans-serif'; g.textAlign='center'; g.fillText('🍶 오늘은 달린다',w/2,h/2+8); g.font='22px sans-serif'; g.fillStyle='#9fc6e8'; g.fillText('DMARK TV',w/2,h/2+48); });
-box(0.4,0.45,0.95,'#2f2a26',3.34,0.225,2.95,true);
-{ box(0.05,0.6,1.05,'#111',3.17,1.15,2.95); const scr=new THREE.Mesh(new THREE.PlaneGeometry(0.98,0.54), new THREE.MeshBasicMaterial({map:tvTex})); scr.rotation.y=Math.PI/2; scr.position.set(3.2,1.15,2.95); scene.add(scr); }
+{ const wx=8.08*SCALE-T/2; box(0.06,0.95,1.65,'#111',wx-0.04,1.35,TB.z); const scr=new THREE.Mesh(new THREE.PlaneGeometry(1.57,0.88), new THREE.MeshBasicMaterial({map:tvTex})); scr.rotation.y=-Math.PI/2; scr.position.set(wx-0.075,1.35,TB.z); scene.add(scr); }
 // 주방: 윗벽 싱크대, 아일랜드(쿡탑), 냉장고
+ANC={x:3.08,z:0};
 box(2.2,0.88,0.6,'#e9e6e1',4.25,0.44,0.36,true); box(2.22,0.04,0.62,'#3a3a3a',4.25,0.9,0.36);
 box(0.5,0.02,0.36,'#9aa0a6',3.95,0.92,0.36); box(2.2,0.6,0.35,'#e9e6e1',4.25,1.95,0.24);
+ANC={x:3.08,z:2.01};
 box(1.39,0.88,0.52,'#e9e6e1',3.78,0.44,2.01,true); box(1.41,0.04,0.54,'#3a3a3a',3.78,0.9,2.01);
 cyl(0.11,0.11,0.01,'#111',3.6,0.925,2.01,20); cyl(0.11,0.11,0.01,'#111',3.87,0.925,2.01,20);
+ANC={x:5.37,z:0.65};
 box(0.68,1.85,0.62,'#cfd3d6',5.0,0.925,0.98,true); box(0.02,0.5,0.03,'#888',4.64,1.2,0.75);
 // 현관문 (닫힘)
+ANC={x:9.8,z:2.85};
 { const d=box(0.1,2.1,0.7,'#5a4636',9.8,1.05,2.85,true); wallMeshes.push(d); box(0.06,0.04,0.14,'#ccc',9.72,1.0,3.05); }
 // 현관: 신발장, 매트
+ANC={x:9.8,z:1.5};
 box(1.3,1.0,0.32,'#d6cbbb',9.05,0.5,1.68,true);
 // 욕실: 세면대, 변기, 샤워
+ANC={x:8.28,z:0};
 box(0.5,0.85,0.42,'#ffffff',7.98,0.425,0.6,true); box(0.38,0.42,0.6,'#ffffff',7.95,0.21,1.4,true); box(0.18,0.4,0.38,'#fafafa',8.15,0.6,1.4);
-cyl(0.12,0.12,0.02,'#c0c6ca',6.3,2.1,0.5,16);
+ANC={x:5.91,z:0};
+cyl(0.12,0.12,0.02,'#c0c6ca',6.3,2.2,0.5,16);
 // 침실1: 침대, 협탁
+ANC={x:0,z:5.57};
 box(2.0,0.35,1.55,'#c4b5a2',1.1,0.175,4.68,true); box(1.96,0.12,1.5,'#f1ece3',1.12,0.41,4.68); box(0.4,0.08,1.4,'#ffffff',0.3,0.5,4.68); box(1.2,0.06,1.52,'#6d8fb3',1.5,0.48,4.68);
 box(0.45,0.5,0.4,'#b89474',2.45,0.25,5.25,true);
 // 드레스룸: 옷장/행거
+ANC={x:0,z:3.17};
 box(2.3,2.0,0.5,'#d9cdbd',1.22,1.0,2.9,true);
+ANC={x:0,z:1.75};
 for (let i=0;i<7;i++) box(0.05,0.8,0.42,['#3a4a6a','#c9c1b5','#7a2f2f','#2f2f2f','#6a8a6a','#e0d6c6','#4a3a2a'][i],0.15+i*0.17,1.45,2.0);
 box(1.3,0.03,0.03,'#888',0.65,1.88,2.0);
 // 침실2: 침대, 책상
+ANC={x:5.53,z:8.11};
 box(1.55,0.35,2.0,'#c4b5a2',4.72,0.175,7.05,true); box(1.5,0.12,1.96,'#f1ece3',4.72,0.41,7.07); box(1.4,0.08,0.4,'#ffffff',4.72,0.5,7.85); box(1.52,0.06,1.1,'#b37a6d',4.72,0.48,6.6);
+ANC={x:2.64,z:7.0};
 box(1.0,0.75,0.5,'#b89474',3.25,0.375,7.0,true); box(0.45,0.3,0.03,'#222',3.25,0.95,7.15);
 // 테라스: 의자 2개, 화분
-for (const [x,z] of [[0.8,6.6],[1.7,6.9]]){ box(0.45,0.05,0.45,'#e8e8e8',x,0.42,z); box(0.45,0.45,0.05,'#e8e8e8',x,0.65,z+0.22); for (const a of [-1,1]) for (const b of [-1,1]) box(0.03,0.42,0.03,'#ddd',x+a*0.2,0.21,z+b*0.2); addBox(x-0.23,z-0.23,x+0.23,z+0.23); }
+ANC={x:1.3,z:6.8};
+for (const [x,z] of [[0.8,6.6],[1.7,6.9]]){ box(0.45,0.05,0.45,'#e8e8e8',x,0.42,z); box(0.45,0.45,0.05,'#e8e8e8',x,0.65,z+0.22); for (const a of [-1,1]) for (const b of [-1,1]) box(0.03,0.42,0.03,'#ddd',x+a*0.2,0.21,z+b*0.2); addBoxA(x-0.23,z-0.23,x+0.23,z+0.23); }
 box(0.5,0.4,0.5,'#e8e8e8',1.25,0.2,7.35,true);
-cyl(0.18,0.13,0.35,'#7a5a42',0.35,0.175,7.75,16); { const p=new THREE.Mesh(new THREE.SphereGeometry(0.3,10,8),mat('#3f7a3a')); p.position.set(0.35,0.62,7.75); scene.add(p); } addBox(0.15,7.55,0.55,7.95);
+ANC={x:0,z:8.11};
+cyl(0.18,0.13,0.35,'#7a5a42',0.35,0.175,7.75,16); { const p=new THREE.Mesh(new THREE.SphereGeometry(0.3,10,8),mat('#3f7a3a')); p.position.set(AX(0.35),0.62,AZ(7.75)); scene.add(p); } addBoxA(0.15,7.55,0.55,7.95);
 // 거실 화분
-cyl(0.16,0.12,0.35,'#7a5a42',7.7,0.175,2.4,16); { const p=new THREE.Mesh(new THREE.SphereGeometry(0.3,10,8),mat('#3f7a3a')); p.position.set(7.7,0.62,2.4); scene.add(p); } addBox(7.5,2.2,7.9,2.6);
+ANC={x:8.08,z:2.0};
+cyl(0.16,0.12,0.35,'#7a5a42',7.7,0.175,2.4,16); { const p=new THREE.Mesh(new THREE.SphereGeometry(0.3,10,8),mat('#3f7a3a')); p.position.set(AX(7.7),0.62,AZ(2.4)); scene.add(p); } addBoxA(7.5,2.2,7.9,2.6);
+ANC=null;
 
 /* ---------------- 아바타 ---------------- */
 const EMPTY_BOTTLES_PER = 7; // 7잔 = 1병
