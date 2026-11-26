@@ -75,7 +75,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
   PC: WASD/방향키 이동 · 마우스 드래그 시점 · 휠 줌 · Enter 채팅<br>
   폰: 왼쪽 조이스틱 이동 · 화면 드래그 시점 · 두 손가락 줌<br>
   바닥을 톡 누르면 거기로 걸어가요. 방석이나 소파를 누르면 가서 앉아요.<br>
-  단축키: 1 따르기 · 2 짠 · 3 원샷 · 4 줴줴이야 · 5 ㅉㅈㅁ · E 앉기
+  단축키: 1 따르기 · 2 짠 · 3 원샷 · 4 줴줴이야 · E 앉기
 </div>
 <div id="net" class="hud panel">서버에 다시 연결하는 중…</div>
 <div id="chatlog" class="hud"></div>
@@ -86,7 +86,6 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
   <button id="aShot"><span>🥃</span>원샷</button>
   <button id="aSit"><span>🪑</span>앉기</button>
   <button class="say" data-say="줴줴이야"><span>🗣️</span>줴줴이야</button>
-  <button class="say" data-say="ㅉㅈㅁ"><span>🙊</span>ㅉㅈㅁ</button>
 </div>
 <form id="chatbar" class="hud" autocomplete="off">
   <input id="chatin" maxlength="120" placeholder="메시지 (Enter)" enterkeyhint="send">
@@ -625,7 +624,7 @@ addEventListener('keydown', e=>{
   if (document.activeElement===$('chatin') || document.activeElement===$('nameIn')){ if (e.key==='Escape') document.activeElement.blur(); return; }
   if (e.key==='Enter'){ e.preventDefault(); $('chatin').focus(); return; }
   const k=e.key.toLowerCase(); input.keys.add(k);
-  if (k==='1') act('pour'); if (k==='2') act('cheers'); if (k==='3') act('shot'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='5') sayOut('ㅉㅈㅁ');
+  if (k==='1') act('pour'); if (k==='2') act('cheers'); if (k==='3') act('shot'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야');
 });
 addEventListener('keyup', e=>input.keys.delete(e.key.toLowerCase()));
 addEventListener('blur', ()=>input.keys.clear());
