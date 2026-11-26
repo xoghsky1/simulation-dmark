@@ -39,6 +39,9 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 #chatbar{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;gap:6px;pointer-events:auto;max-width:520px}
 #chatbar input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 12px;outline:none}
 #chatbar input:focus{border-color:var(--accent)}
+#drunk{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 28%,rgba(90,10,70,.45) 62%,rgba(25,0,25,.92) 100%)}
+#drunkTag{left:50%;top:calc(12px + env(safe-area-inset-top));transform:translateX(-50%);padding:6px 12px;font-size:14px;display:none}
+#faint{position:fixed;inset:0;z-index:15;background:#000;opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#f6efe6;font-size:22px;text-align:center;transition:opacity 1.2s}
 #ko{left:50%;top:38%;transform:translate(-50%,-50%);padding:16px 22px;font-size:18px;text-align:center;display:none;line-height:1.5}
 #ko b{font-size:30px;color:#ff6b6b}
 #toast{left:50%;top:30%;transform:translateX(-50%);padding:10px 16px;font-size:15px;opacity:0;transition:opacity .3s;white-space:nowrap}
@@ -100,6 +103,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
   <button type="submit">전송</button>
 </form>
 <div id="toast" class="hud panel"></div>
+<div id="drunk"></div><div id="drunkTag" class="hud panel">🌀 어질어질…</div><div id="faint"><b style="font-size:32px">🍺 필름 끊김…</b><span id="faintMsg" style="margin-top:10px;opacity:.8">zZZ</span></div>
 <div id="ko" class="hud panel"><b>💀 KO!</b><br><span id="koMsg"></span><br><span id="koCount"></span></div>
 
 <div id="gate">
@@ -651,10 +655,10 @@ let channel = null, online = false;
 let lastSend = 0, lastTrack = 0, trackTimer = null, wasMoving = false;
 function sendInterval(){ const n = others.size + 1; return clamp(n*n*0.3/60, 0.15, 2.0) * 1000; }
 function send(event, payload){ if (!channel || !online) return; channel.send({ type:'broadcast', event, payload: { ...payload, id: myId } }).catch(()=>{}); }
-function myState(){ return { name: me.name, color: me.color, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), sit: me.sit, drinks: me.drinks, fill: me.fill, hp: me.hp }; }
+function myState(){ return { name: me.name, color: me.color, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), sit: me.sit, drinks: me.drinks, fill: me.fill, hp: me.hp, fz: faintUntil?1:0 }; }
 function sendMove(force=false){
   const now=performance.now(); if (!force && now-lastSend < sendInterval()) return; lastSend=now;
-  const p = { x:+me.x.toFixed(2), z:+me.z.toFixed(2), ry:+me.ry.toFixed(2), vx:+(me.vx||0).toFixed(2), vz:+(me.vz||0).toFixed(2), sit:me.sit, hp:me.hp };
+  const p = { x:+me.x.toFixed(2), z:+me.z.toFixed(2), ry:+me.ry.toFixed(2), vx:+(me.vx||0).toFixed(2), vz:+(me.vz||0).toFixed(2), sit:me.sit, hp:me.hp, fz: faintUntil?1:0 };
   if (target){ p.tx=+target.x.toFixed(2); p.tz=+target.z.toFixed(2); p.ts=target.seat; }
   send('mv', p); scheduleTrack();
 }
@@ -675,7 +679,7 @@ function applyPresence(){
   for (const key in ps){ const metas = ps[key]; if (!metas || !metas.length || key===myId) continue; const st = metas[metas.length-1]; seen.add(key);
     const isNew = !others.has(key); const o = getOther(key, st);
     o.av.setName(String(st.name||'손님').slice(0,12)); o.av.setDrinks(Math.max(o.av.drinks, num(st.drinks))); if (isNew) o.av.setFill(st.fill);
-    if (isNew){ o.av.setHp(st.hp); o.av.dead = o.av.hp<=0; o.av.sit = Number.isInteger(st.sit) && seats[st.sit] ? st.sit : -1; if (o.av.sit>=0){ o.av.x=seats[o.av.sit].x; o.av.z=seats[o.av.sit].z; o.av.ry=seats[o.av.sit].ry; } }
+    if (isNew){ o.av.setHp(st.hp); o.av.dead = o.av.hp<=0 || st.fz===1; o.av.sit = Number.isInteger(st.sit) && seats[st.sit] ? st.sit : -1; if (o.av.sit>=0){ o.av.x=seats[o.av.sit].x; o.av.z=seats[o.av.sit].z; o.av.ry=seats[o.av.sit].ry; } }
     else if (!o.net && !o.target){ o.av.sit = Number.isInteger(st.sit) && seats[st.sit] ? st.sit : -1; }
     if (isNew && joinedAt && performance.now()-joinedAt > 2500) sys(`${o.av.name} 님이 들어왔어요 🙌`);
   }
@@ -692,7 +696,7 @@ function connect(){
   channel.on('broadcast', { event:'mv' }, ({payload:p})=>{
     if (!p || p.id===myId || typeof p.id!=='string') return; const o=getOther(p.id); o.lastSeen=performance.now();
     const x=clamp(num(p.x),0,HOUSE.W), z=clamp(num(p.z),0,HOUSE.D);
-    if (typeof p.hp==='number'){ o.av.setHp(p.hp); o.av.dead = o.av.hp<=0; }
+    if (typeof p.hp==='number'){ o.av.setHp(p.hp); o.av.dead = o.av.hp<=0 || p.fz===1; }
     if (p.tx!=null){ o.target={ x:clamp(num(p.tx),0,HOUSE.W), z:clamp(num(p.tz),0,HOUSE.D), seat: Number.isInteger(p.ts)&&seats[p.ts]?p.ts:-1 }; o.net=null; o.av.sit=-1;
       if (Math.hypot(o.av.x-x,o.av.z-z)>1.2){ o.av.x=x; o.av.z=z; } }
     else { o.target=null; o.net={ x, z, vx:clamp(num(p.vx),-3,3), vz:clamp(num(p.vz),-3,3), ry:num(p.ry), t:performance.now() };
@@ -719,6 +723,8 @@ function doActEffect(av, type, p, mine){
   else if (type==='jump'){ av.jump=0.6; }
   else if (type==='poop'){ poopFx(av, mine||near); }
   else if (type==='ko'){ av.dead=true; av.setHp(0); sys(`💀 ${av.name} KO!${p && p.by ? ' ('+String(p.by).slice(0,12)+' 승)' : ''}`); }
+  else if (type==='faint'){ av.dead=true; av.sit=-1; av.pop('zZZ 💤','#c9b6ff',true,1.2); sys(`🍺 ${av.name} 필름 끊김… (5병 넘음)`); }
+  else if (type==='wake'){ if (av.hp>0) av.dead=false; av.pop('…여기 어디야','#ffffff'); }
   else if (type==='respawn'){ av.dead=false; av.setHp(100); av.sit=-1; av.x=HOUSE.spawn.x; av.z=HOUSE.spawn.z; av.ry=HOUSE.spawn.ry; av.pop('부활!','#9fe8ff'); }
   else if (type==='shot'){ av.setFill(0); av.raise=1.0; if (p && p.d!=null) av.setDrinks(p.d); av.pop(['캬~','크으','원샷!','한 잔 더'][Math.floor(Math.random()*4)],'#ffffff'); if (mine||near) gulp(); updateHUD(); }
 }
@@ -727,7 +733,7 @@ function act(type){
   if (type==='pour'){ if (me.fill>0.9){ toast('잔 이미 가득 찼어요'); return; } doActEffect(me,'pour',null,true); send('act',{type:'pour'}); }
   else if (type==='cheers'){ doActEffect(me,'cheers',null,true); send('act',{type:'cheers'});
     const n=[...others.values()].filter(o=>Math.hypot(o.av.x-me.x,o.av.z-me.z)<2.6).length; if (n) toast(`${n}명이랑 짠! 🥂`); }
-  else if (type==='shot'){ if (me.fill<0.1){ toast('잔이 비었어요. 먼저 따르세요 🍶'); return; } me.setDrinks(me.drinks+1); doActEffect(me,'shot',{d:me.drinks},true); send('act',{type:'shot', d:me.drinks}); store.set('dm_drinks_'+new Date().toDateString(), String(me.drinks)); }
+  else if (type==='shot'){ if (me.fill<0.1){ toast('잔이 비었어요. 먼저 따르세요 🍶'); return; } me.setDrinks(me.drinks+1); bac += 1/EMPTY_BOTTLES_PER; doActEffect(me,'shot',{d:me.drinks},true); send('act',{type:'shot', d:me.drinks}); store.set('dm_drinks_'+new Date().toDateString(), String(me.drinks)); }
   scheduleTrack();
 }
 $('aPour').onclick=()=>act('pour'); $('aCheers').onclick=()=>act('cheers'); $('aShot').onclick=()=>act('shot');
@@ -795,6 +801,29 @@ const NPC = (()=>{
   }
   return { av, update, hit, get route(){ if (!route) build(); return route; } };
 })();
+/* ---------------- 술 취함: 3병부터 어질어질, 5병이면 기절 ---------------- */
+let bac = 0, faintUntil = 0; // bac = 몸에 남은 술(병). 4분에 1병씩 깸
+const drunkK = () => clamp((bac-3)/2, 0, 1);
+function faint(){
+  if (!me || me.dead) return; if (me.sit>=0) standUp(); target=null; me.dead=true; faintUntil=performance.now()+10000;
+  doActEffect(me,'faint',null,true); send('act',{type:'faint'}); sendMove(true);
+  const f=$('faint'); f.style.pointerEvents='auto'; f.style.opacity='0.92';
+}
+function wake(){
+  faintUntil=0; bac=3.6; me.dead=false; me.setHp(me.hp||100); const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
+  doActEffect(me,'wake',null,true); send('act',{type:'wake'}); sendMove(true); toast('으… 정신 차림. 아직 어질어질해요');
+}
+function updateDrunk(dt, t){
+  if (!me) return;
+  if (faintUntil){ const left=Math.ceil((faintUntil-performance.now())/1000); $('faintMsg').textContent = left>0 ? `zZZ… ${left}초 뒤 정신 차림` : ''; if (left<=0) wake(); return; }
+  bac = Math.max(0, bac - dt/240);
+  if (bac>=5 && !me.dead){ faint(); return; }
+  const k=drunkK(); const c=$('c');
+  if (k>0){ const b=(k*3.6*(0.55+0.45*Math.sin(t*1.7))).toFixed(2), h=(Math.sin(t*0.7)*k*25).toFixed(1), sat=(1+k*0.7).toFixed(2);
+    c.style.filter=`blur(${b}px) saturate(${sat}) hue-rotate(${h}deg)`; $('drunk').style.opacity=(0.35+0.45*k+0.15*Math.sin(t*2.1)*k).toFixed(2); $('drunkTag').style.display='block';
+    $('drunkTag').textContent = bac>=4.3 ? '🌀🌀 곧 필름 끊김…' : '🌀 어질어질…'; }
+  else if (c.style.filter){ c.style.filter=''; $('drunk').style.opacity='0'; $('drunkTag').style.display='none'; }
+}
 /* ---------------- 💩 똥싸기 (변기 근처에서만) ---------------- */
 let wantPoop=false, poopCd=0, poopBusy=0;
 const poopMat = new THREE.MeshPhongMaterial({ color:'#7a4a1e', shininess:60, specular:'#c89a5a' });
@@ -974,7 +1003,7 @@ const marker=new THREE.Mesh(new THREE.RingGeometry(0.12,0.17,24), new THREE.Mesh
   const enter=()=>{ const name=$('nameIn').value.trim().slice(0,12); if (!name){ $('nameIn').focus(); $('gateNote').textContent='이름을 써주세요 🙏'; return; }
     store.set('dm_name',name); store.set('dm_color',pick); audio();
     me = new Avatar(myId, name, pick); me.vx=0; me.vz=0;
-    const d = parseInt(store.get('dm_drinks_'+new Date().toDateString())||'0',10); if (d>0) me.setDrinks(d);
+    const d = parseInt(store.get('dm_drinks_'+new Date().toDateString())||'0',10); if (d>0) me.setDrinks(d); bac = Math.min(d/EMPTY_BOTTLES_PER, 4.5);
     camYaw = HOUSE.spawn.ry+Math.PI; $('gate').remove(); updateHUD(); connect();
     sys('바닥을 누르면 걸어가고, 방석을 누르면 앉아요. 🍶 따르고 🥂 짠!');
     setTimeout(()=>{ if (me.sit<0 && !target){ const i=nearestFreeSeat(me.x,me.z,true); if (i>=0) sitAt(i); } }, 2200);
@@ -993,6 +1022,7 @@ function step(){
     let ix=input.x, iz=input.z; const K=input.keys;
     if (me.dead){ ix=0; iz=0; target=null; K.clear(); }
     if (K.has('w')||K.has('arrowup')) iz-=1; if (K.has('s')||K.has('arrowdown')) iz+=1; if (K.has('a')||K.has('arrowleft')) ix-=1; if (K.has('d')||K.has('arrowright')) ix+=1;
+    { const k=drunkK(); if (k>0 && (ix||iz)){ const sw=Math.sin(t*1.9)*k*0.7; const nx=ix - iz*sw, nz=iz + ix*sw; ix=nx; iz=nz; } }
     const m=Math.hypot(ix,iz); let vx=0, vz=0;
     if (m>0.15){ if (me.sit>=0) standUp(); target=null; const s=Math.min(1,m)/m; ix*=s; iz*=s;
       const sin=Math.sin(camYaw), cos=Math.cos(camYaw);
@@ -1020,7 +1050,7 @@ function step(){
     if (Math.abs(av.kvx)+Math.abs(av.kvz)>0.02){ [av.x,av.z]=collide(av.x+av.kvx*dt, av.z+av.kvz*dt); }
     av.tick(dt,t);
   }
-  NPC.update(dt, t); updateDoors(dt); updateBlood(dt);
+  updateDrunk(dt, t); NPC.update(dt, t); updateDoors(dt); updateBlood(dt);
   for (let i=floaters.length-1;i>=0;i--){ const f=floaters[i]; f.t+=dt; f.s.position.y=(f.y0||1.5)+f.t*(f.big?1.1:0.6); if (f.big){ const sc=f.t<0.12 ? 0.6+f.t/0.12*0.6 : 1.2-Math.min(0.2,(f.t-0.12)); if (!f.base) f.base=f.s.scale.clone(); f.s.scale.set(f.base.x*sc, f.base.y*sc, 1); } f.s.material.opacity=1-f.t/1.4; if (f.t>1.4){ f.parent.remove(f.s); f.s.material.map.dispose(); f.s.material.dispose(); floaters.splice(i,1); } }
   if (markerT>0){ markerT-=dt; marker.material.opacity=markerT; if (markerT<=0) marker.visible=false; }
 
@@ -1032,7 +1062,8 @@ function step(){
     const dir=new THREE.Vector3(Math.sin(camYaw)*Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw)*Math.cos(camPitch));
     let dist=camDist; camRay.set(camTarget, dir); camRay.far=camDist; const hit=camRay.intersectObjects(wallMeshes,false)[0]; if (hit) dist=Math.max(0.05, hit.distance-0.18); me.g.visible = dist > 0.8;
     const pos=camTarget.clone().addScaledVector(dir,dist); if (pos.y>HOUSE.H-0.12){ pos.y=HOUSE.H-0.12; }
-    camera.position.lerp(pos, Math.min(1, dt*12)); camera.lookAt(camTarget.x, camTarget.y-0.1, camTarget.z); camera.rotation.z += wob;
+    camera.position.lerp(pos, Math.min(1, dt*12)); { const k=drunkK(); if (k>0){ camera.position.x += Math.sin(t*1.1)*k*0.25; camera.position.y += Math.sin(t*1.7)*k*0.1; camera.position.z += Math.cos(t*0.9)*k*0.25; } camera.lookAt(camTarget.x, camTarget.y-0.1, camTarget.z); camera.rotation.z += wob + (k>0 ? Math.sin(t*0.8)*k*0.16 : 0);
+      const fov=(innerWidth<innerHeight?72:60) + (k>0 ? Math.sin(t*1.3)*k*7 : 0); if (Math.abs(camera.fov-fov)>0.01){ camera.fov=fov; camera.updateProjectionMatrix(); } }
     if (shake>0.001){ camera.position.x += (Math.random()-.5)*shake*0.25; camera.position.y += (Math.random()-.5)*shake*0.25; camera.rotation.z += (Math.random()-.5)*shake*0.12; shake*=Math.exp(-10*dt); }
   } else { const a=t*0.08; camera.position.set(TB.x+Math.sin(a)*2.6, 1.7, TB.z+Math.cos(a)*2.6); camera.lookAt(TB.x,0.5,TB.z); }
   if (location.hash==='#top'){ camera.position.set(HOUSE.W/2, 13, HOUSE.D/2+0.01); camera.lookAt(HOUSE.W/2,0,HOUSE.D/2); }
@@ -1041,7 +1072,7 @@ function step(){
 }
 requestAnimationFrame(step);
 setInterval(updateHUD, 3000);
-window.__dm = { get me(){return me;}, others, seats, act, NPC };
+window.__dm = { get me(){return me;}, others, seats, act, NPC, setBac:v=>{bac=v;} };
 </script>
 </body>
 </html>
