@@ -67,8 +67,8 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 #wbBar .col{width:34px;min-width:34px;padding:0;border:3px solid rgba(255,255,255,.3)}
 #wbBar .on{outline:3px solid #ffd54a;outline-offset:1px}
 #wbInfo{color:#ddd;font-size:12px}
-#aThrow b{font-weight:600}#aThrow.empty>span,#aThrow.empty>b{opacity:.5}
-#aThrowBar{display:block;width:46px;height:5px;border-radius:3px;background:rgba(255,255,255,.2);overflow:hidden}#aThrowBar i{display:block;height:100%;width:0;background:#4cd964;transition:width .3s}
+#actions #aThrow{grid-column:span 2;width:auto}#aThrow b{font-weight:700}#aThrow.empty>span,#aThrow.empty>b{opacity:.5}
+#aThrowBar{display:block;width:100px;height:5px;border-radius:3px;background:rgba(255,255,255,.2);overflow:hidden}#aThrowBar i{display:block;height:100%;width:0;background:#4cd964;transition:width .3s}
 #aThrow.charged{animation:charged .9s ease-out 2}@keyframes charged{0%{box-shadow:0 0 0 0 rgba(76,217,100,.9);transform:scale(1)}40%{transform:scale(1.18);background:#2e9d4a}100%{box-shadow:0 0 0 22px rgba(76,217,100,0);transform:scale(1)}}
 #chargePop{position:fixed;left:50%;top:32%;transform:translate(-50%,-50%) scale(.6);z-index:12;pointer-events:none;opacity:0;background:rgba(20,60,30,.92);border:2px solid #4cd964;color:#fff;border-radius:18px;padding:12px 20px;text-align:center;font-weight:800;font-size:20px;transition:opacity .25s,transform .25s}
 #chargePop.show{opacity:1;transform:translate(-50%,-50%) scale(1)}#chargePop small{display:block;font-size:13px;font-weight:600;color:#c9ffd5;margin-top:4px}
@@ -124,14 +124,14 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <div id="actions" class="hud">
   <button id="aWb" style="display:none" data-key="B" title="단축키 B"><span>✍️</span>방명록 쓰기</button>
   <button id="aPoop" style="display:none" data-key="P" title="단축키 P"><span>💩</span>똥싸기</button>
-  <button id="aCheers" data-key="2" title="단축키 2"><span>🥂</span>짠!</button>
   <button id="aShot" data-key="1" title="단축키 1"><span>🥃</span>원샷</button>
-  <button id="aSit" data-key="E" title="단축키 E"><span>🪑</span>앉기</button>
   <button class="say" data-say="줴줴이야" data-key="4" title="단축키 4"><span>🗣️</span>줴줴이야</button>
+  <button id="aSit" data-key="E" title="단축키 E"><span>🪑</span>앉기</button>
   <button id="aJump" data-key="SP" title="단축키 Space"><span>⬆️</span>점프</button>
   <button id="aPunch" data-key="F" title="단축키 F"><span>👊</span>펀치</button>
   <button id="aKick" data-key="G" title="단축키 G"><span>🦶</span>발차기</button>
-  <button id="aThrow" data-key="T" title="단축키 T"><span>🍾</span><b id="aThrowN">병 0</b><i id="aThrowBar"><i></i></i></button>
+  <button id="aThrow" data-key="T" title="단축키 T"><span>🍾</span><b id="aThrowN">병날리기</b><i id="aThrowBar"><i></i></i></button>
+  <button id="aCheers" data-key="2" title="단축키 2"><span>🥂</span>짠!</button>
   <button id="aCond" data-key="C" title="단축키 C"><span>🧃</span>컨디션</button>
 </div>
 <form id="chatbar" class="hud" autocomplete="off">
@@ -165,7 +165,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127i';
+window.APP_VER='v20261127j';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -1129,7 +1129,7 @@ const throwKey=()=>'dm_thrown_'+new Date().toDateString();
 let thrown = parseInt(store.get(throwKey())||'0',10) || 0, throwReady=0;
 const bottlesLeft = () => me ? Math.max(0, Math.floor(me.drinks/EMPTY_BOTTLES_PER) - thrown) : 0;
 let lastEarned=-1, chargeT=0;
-function updateThrowBtn(){ if (!me) return; const n=bottlesLeft(), b=$('aThrow'), prog=me.drinks%EMPTY_BOTTLES_PER, t=`병 ${n} · ${prog}/${EMPTY_BOTTLES_PER}`;
+function updateThrowBtn(){ if (!me) return; const n=bottlesLeft(), b=$('aThrow'), prog=me.drinks%EMPTY_BOTTLES_PER, t=`병날리기 (${n}병 · ${prog}/${EMPTY_BOTTLES_PER})`;
   if ($('aThrowN').textContent!==t){ $('aThrowN').textContent=t; b.classList.toggle('empty', n<=0); $('aThrowBar').firstChild.style.width=(prog/EMPTY_BOTTLES_PER*100)+'%'; }
   const earned=Math.floor(me.drinks/EMPTY_BOTTLES_PER); if (lastEarned>=0 && earned>lastEarned){ chargePop(n); } lastEarned=earned; }
 function chargePop(n){ const p=$('chargePop'); p.innerHTML=`🍾 소주병 충전 완료!<small>던질 병 ${n}개 · T 키 / 🍾 버튼으로 던지기</small>`; p.classList.add('show'); clearTimeout(chargeT); chargeT=setTimeout(()=>p.classList.remove('show'), 2200);
