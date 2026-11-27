@@ -165,7 +165,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127k';
+window.APP_VER='v20261127m';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -435,6 +435,65 @@ const faceTo = (x,z) => Math.atan2(TB.x-x, TB.z-z);
   box(cx1-cx0,0.4,0.85,'#e6e0d4',(cx0+cx1)/2,0.2,sz1-0.425,true); box(cx1-cx0,0.55,0.2,'#e2dccf',(cx0+cx1)/2,0.35,sz1);
   { const i=seats.length; const x=(cx0+cx1)/2, z=sz1-0.45; seats.push({x,z,ry:Math.PI,kind:'sofa'}); const c=box(cx1-cx0-0.05,0.12,0.6,'#f3efe6',x,0.45,z-0.05); c.userData.seat=i; seatMeshes.push(c); }
   for (const [dz,rot] of [[-0.55,0.2],[0.3,-0.15]]){ const pl=box(0.14,0.38,0.5,'#f6f3ec',sx-0.17,0.68,TB.z+dz); pl.rotation.z=rot; }
+  // 소파 구석 인형 (팬메이드 꼬마 인형: 딸기빛 금발 단발 + 베레모 + 빨간 눈)
+  { const ref=box(0.01,0.01,0.01,'#000',sx-0.02,0.51,sz0+0.24); ref.visible=false; const P=ref.position.clone();
+    const d=new THREE.Group(); d.position.copy(P); d.rotation.y=Math.PI/2+0.3; d.scale.setScalar(1.75); scene.add(d);
+    const tone=(c)=>new THREE.MeshToonMaterial({ color:c });
+    const skin=tone('#ffe6d6'), hairM=tone('#f6b88f'), hairD=tone('#e59c74'), blouse=tone('#fbfbff'), skirt=tone('#2a2d4f'), beretM=tone('#a8212c'), ribbon=tone('#d42a3a'), sock=tone('#ffffff'), shoe=tone('#3a2420');
+    const add=(geo,m,x,y,z,par=d)=>{ const o=new THREE.Mesh(geo,m); o.position.set(x,y,z); par.add(o); return o; };
+    // 몸 (앉은 자세)
+    const torso=add(new THREE.CylinderGeometry(0.05,0.068,0.1,20), blouse, 0,0.1,0);
+    const sk=add(new THREE.CylinderGeometry(0.068,0.095,0.06,24), skirt, 0,0.045,0.005);
+    add(new THREE.TorusGeometry(0.093,0.006,6,28), skirt, 0,0.017,0.005).rotation.x=Math.PI/2;
+    const col=add(new THREE.CylinderGeometry(0.056,0.06,0.02,20,1,false,-Math.PI/2.2,Math.PI*1.1), skirt, 0,0.145,0.0); // 세일러 칼라
+    for (const s of [-1,1]){ const r=add(new THREE.SphereGeometry(0.014,10,8), ribbon, s*0.014,0.138,0.055); r.scale.set(1.4,0.9,0.5); r.rotation.z=s*0.5;
+      const tl=add(new THREE.BoxGeometry(0.01,0.03,0.004), ribbon, s*0.008,0.118,0.058); tl.rotation.z=s*0.25; }
+    add(new THREE.SphereGeometry(0.007,8,6), ribbon, 0,0.138,0.058);
+    for (const s of [-1,1]){ // 팔
+      const arm=add(new THREE.CapsuleGeometry(0.017,0.05,4,10), blouse, s*0.06,0.1,0.015); arm.rotation.z=s*0.35; arm.rotation.x=-0.35;
+      add(new THREE.SphereGeometry(0.017,10,8), skin, s*0.074,0.065,0.04);
+      const leg=add(new THREE.CapsuleGeometry(0.02,0.06,4,10), sock, s*0.032,0.025,0.075); leg.rotation.x=Math.PI/2-0.15;
+      add(new THREE.SphereGeometry(0.022,10,8), shoe, s*0.032,0.03,0.125).scale.set(1,0.85,1.25); }
+    // 머리
+    const head=new THREE.Group(); head.position.y=0.245; d.add(head);
+    const HR=0.1; const hd=add(new THREE.SphereGeometry(HR,32,24), skin, 0,0,0, head); hd.scale.set(1.05,0.96,0.98);
+    // 얼굴 텍스처 (애니풍 눈)
+    const fc=document.createElement('canvas'); fc.width=fc.height=512; const g=fc.getContext('2d');
+    const eye=(cx)=>{ g.save(); g.translate(cx,298); g.scale(1.36,1.36);
+      g.fillStyle='#fff'; g.beginPath(); g.ellipse(0,0,46,62,0,0,Math.PI*2); g.fill();
+      const ir=g.createLinearGradient(0,-55,0,60); ir.addColorStop(0,'#5c0610'); ir.addColorStop(0.45,'#c3122a'); ir.addColorStop(1,'#ff6f7d');
+      g.fillStyle=ir; g.beginPath(); g.ellipse(0,6,38,54,0,0,Math.PI*2); g.fill();
+      g.fillStyle='#3a0208'; g.beginPath(); g.ellipse(0,4,17,26,0,0,Math.PI*2); g.fill();
+      g.strokeStyle='rgba(255,170,180,.7)'; g.lineWidth=3; g.beginPath(); g.ellipse(0,6,30,44,0,Math.PI*0.15,Math.PI*0.85); g.stroke();
+      g.fillStyle='#fff'; g.beginPath(); g.ellipse(-14,-22,13,17,-0.3,0,Math.PI*2); g.fill(); g.beginPath(); g.arc(14,26,6,0,Math.PI*2); g.fill(); g.beginPath(); g.arc(-4,32,3,0,Math.PI*2); g.fill();
+      g.strokeStyle='#2a1410'; g.lineCap='round'; g.lineWidth=11; g.beginPath(); g.ellipse(0,2,50,64,0,Math.PI*1.12,Math.PI*1.88); g.stroke(); // 윗 속눈썹
+      g.lineWidth=6; g.beginPath(); g.moveTo(cx<256?-50:50,-30); g.lineTo(cx<256?-64:64,-42); g.stroke();
+      g.lineWidth=3; g.beginPath(); g.ellipse(0,4,44,60,0,Math.PI*0.3,Math.PI*0.7); g.stroke(); g.restore(); };
+    eye(158); eye(354);
+    g.strokeStyle='#c98466'; g.lineWidth=5; g.lineCap='round'; for (const [x,s] of [[162,-1],[350,1]]){ g.beginPath(); g.moveTo(x-34,186+(s<0?6:0)); g.quadraticCurveTo(x,174,x+34,186+(s>0?6:0)); g.stroke(); }
+    g.fillStyle='rgba(255,120,140,.35)'; for (const x of [130,382]){ g.beginPath(); g.ellipse(x,388,40,18,0,0,Math.PI*2); g.fill(); }
+    g.strokeStyle='rgba(230,80,100,.6)'; g.lineWidth=3; for (const x of [130,382]) for (let i=-1;i<=1;i++){ g.beginPath(); g.moveTo(x+i*14-6,396); g.lineTo(x+i*14+6,380); g.stroke(); }
+    g.strokeStyle='#8a3c3c'; g.lineWidth=5; g.beginPath(); g.moveTo(236,420); g.quadraticCurveTo(246,432,256,422); g.quadraticCurveTo(266,432,276,420); g.stroke();
+    const ft=new THREE.CanvasTexture(fc); ft.colorSpace=THREE.SRGBColorSpace; ft.anisotropy=4;
+    const face=add(new THREE.SphereGeometry(HR*1.004,32,24,Math.PI/2-0.85,1.7,Math.PI/2-0.75,1.3), new THREE.MeshBasicMaterial({ map:ft, transparent:true, depthWrite:false }), 0,0,0, head); face.scale.copy(hd.scale);
+    // 머리카락: 뒷머리 + 단발 옆머리 + 앞머리 가닥
+    const cap=add(new THREE.SphereGeometry(HR*1.08,32,20,0,Math.PI*2,0,Math.PI*0.56), hairM, 0,0.006,-0.004, head); cap.scale.set(1.06,1,1.02); cap.rotation.x=-0.5;
+    const backH=add(new THREE.SphereGeometry(HR*1.05,28,20,0,Math.PI*2,Math.PI*0.3,Math.PI*0.5), hairM, 0,-0.006,-0.018, head); backH.scale.set(1.08,1.05,1.0); backH.rotation.x=-0.25;
+    const strand=(x,y,z,len,w,rx,rz,m=hairM)=>{ const c=add(new THREE.ConeGeometry(w,len,16), m, x,y,z, head); c.rotation.set(Math.PI+rx,0,rz); c.scale.z=0.45; return c; };
+    for (const s of [-1,1]){ // 옆머리 (턱선까지, 안쪽으로 말림)
+      strand(s*0.092,-0.035,0.02,0.11,0.035,0.05,-s*0.12); strand(s*0.08,-0.05,0.05,0.085,0.026,-0.15,-s*0.05,hairD); strand(s*0.095,-0.03,-0.03,0.12,0.04,0.12,-s*0.18);
+      const curl=add(new THREE.TorusGeometry(0.02,0.009,8,14,Math.PI), hairM, s*0.085,-0.088,0.03, head); curl.rotation.set(0,Math.PI/2,Math.PI); }
+    for (let i=-3;i<=3;i++){ const a=i*0.27; const len=(Math.abs(i)>=2?0.085:0.052)+(i%2?0.008:0); // 앞머리 (눈 위에서 끝남, 양끝은 길게)
+      const top=0.098-Math.abs(i)*0.006, tipY=Math.abs(i)>=2?-0.0:0.036; const cy=(top+tipY)/2, r=0.1+0.004;
+      const c=strand(Math.sin(a)*r*Math.cos(cy/0.1*0.9), cy, Math.cos(a)*r*Math.cos(cy/0.1*0.9)+0.003, top-tipY, 0.03, -0.42, -i*0.05+(i%2?0.07:-0.05), i%3===0?hairD:hairM); c.rotation.y=a; }
+    const ah=add(new THREE.TorusGeometry(0.025,0.006,6,14,Math.PI*1.2), hairM, 0.01,0.115,0.01, head); ah.rotation.set(0,0.4,0.6); // 바보털
+    // 베레모
+    const ber=new THREE.Group(); ber.position.set(0.022,0.088,-0.012); ber.rotation.set(-0.15,0,-0.3); head.add(ber);
+    const bt=add(new THREE.SphereGeometry(0.098,32,16), beretM, 0,0.012,0, ber); bt.scale.set(1.08,0.32,1.08);
+    add(new THREE.TorusGeometry(0.083,0.008,8,32), tone('#7d1720'), 0,0.0,0, ber).rotation.x=Math.PI/2;
+    add(new THREE.CylinderGeometry(0.004,0.006,0.016,8), tone('#7d1720'), 0.005,0.045,0, ber);
+    const pin=add(new THREE.SphereGeometry(0.011,10,8), tone('#ffd24a'), 0.07,0.012,0.045, ber); pin.scale.set(1,1,0.5);
+    head.rotation.set(0.06,0,0.1); window.__plush=d; }
 }
 // (흰 타원 테이블 제거)
 // 벽걸이 TV (거실 오른벽, 예전 소파 자리)
@@ -1406,6 +1465,7 @@ function step(){
     if (shake>0.001){ camera.position.x += (Math.random()-.5)*shake*0.25; camera.position.y += (Math.random()-.5)*shake*0.25; camera.rotation.z += (Math.random()-.5)*shake*0.12; shake*=Math.exp(-10*dt); }
   } else { const a=t*0.08; camera.position.set(TB.x+Math.sin(a)*2.6, 1.7, TB.z+Math.cos(a)*2.6); camera.lookAt(TB.x,0.5,TB.z); }
   if (location.hash==='#top'){ camera.position.set(HOUSE.W/2, 13, HOUSE.D/2+0.01); camera.lookAt(HOUSE.W/2,0,HOUSE.D/2); }
+  if (window.__camOverride){ const o=window.__camOverride; camera.position.set(o.p[0],o.p[1],o.p[2]); camera.lookAt(o.t[0],o.t[1],o.t[2]); }
   renderer.render(scene,camera);
   requestAnimationFrame(step);
 }
