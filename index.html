@@ -173,8 +173,9 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
-  ['1.27','11/27 16:25','🐱 냥이 집 안 로밍 · 쓰다듬기/츄르 친밀도 · 1등 따라다님 · 🛏️ 침대 눕기 · 원샷 연타'],
-  ['1.26','11/27 16:00','🛏️ 필름 끊기면 침대에서 인형 옆에 누운 채로 깨어남'],
+  ['1.28','11/27 16:02','🛏️ 침대에 누우면 침대 전체가 보이는 카메라 · 인형 사람 크기'],
+  ['1.27','11/27 15:58','🐱 냥이 집 안 로밍 · 쓰다듬기/츄르 친밀도 · 1등 따라다님 · 🛏️ 침대 눕기 · 원샷 연타'],
+  ['1.26','11/27 15:50','🛏️ 필름 끊기면 침대에서 인형 옆에 누운 채로 깨어남'],
   ['1.25','11/27 15:45','🥊 한마바키 창주 고무고무 피스톨 (원거리 주먹)'],
   ['1.24','11/27 15:34','🏃 달리기 (방향키 두 번 연타 · 조이스틱 끝까지)'],
   ['1.23','11/27 15:32','☠️ 우측 상단 킬 피드'],
@@ -214,7 +215,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127v';
+window.APP_VER='v20261127w';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -634,7 +635,7 @@ const TOILET = { x: 8.28*SCALE - T/2 - 0.5, z: 1.24*SCALE - T/2 - 0.42, seat: -1
 ANC={x:0,z:5.57};
 box(2.0,0.35,1.55,'#d8d8d4',1.1,0.175,4.68,true); box(1.96,0.16,1.5,'#fbfaf7',1.12,0.43,4.68); box(0.4,0.1,1.4,'#ffffff',0.3,0.55,4.68); box(1.1,0.1,1.54,'#ece9e2',1.5,0.52,4.68); box(0.5,0.18,0.6,'#e4e0d6',0.9,0.6,4.3);
 const BED={ x0:AX(0.1), x1:AX(2.1), z0:AZ(3.9), z1:AZ(5.46), sx:AX(1.25), sz:AZ(4.75), wx:AX(1.2), wz:AZ(3.9)-0.45 }; // 필름 끊기면 여기서 눕고 일어남
-if (window.__plush){ const d=window.__plush; d.position.set(BED.sx-0.4, 0.58, BED.sz+0.4); d.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,0,-1), new THREE.Vector3(-1,0,0), new THREE.Vector3(0,1,0))); d.rotateY(-0.35); } // 인형: 필름 끊긴 사람 옆에 나란히 누워 있음
+if (window.__plush){ const d=window.__plush; d.scale.setScalar(2.1); d.position.set(BED.sx-0.2, 0.64, BED.sz+0.45); /* 사람 크기 */ d.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,0,-1), new THREE.Vector3(-1,0,0), new THREE.Vector3(0,1,0))); d.rotateY(-0.35); } // 인형: 필름 끊긴 사람 옆에 나란히 누워 있음
 BED.seat=seats.length; seats.push({ x:BED.sx, z:BED.sz, ry:Math.PI/2, kind:'bed' }); // 눕기 자리 (인형 옆)
 const onBed=(x,z)=>x>BED.x0&&x<BED.x1&&z>BED.z0&&z<BED.z1;
 // 옷방 (거실 아래쪽 방): 흰 행거 두 줄 + 옷
@@ -1602,7 +1603,8 @@ function step(){
     const wob = 0; // 화면 흔들림은 취한 정도(bac)로만 → drunkK()
     const dir=new THREE.Vector3(Math.sin(camYaw)*Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw)*Math.cos(camPitch));
     let dist=camDist; camRay.set(camTarget, dir); camRay.far=camDist; const hit=camRay.intersectObjects(wallMeshes,false)[0]; if (hit) dist=Math.max(0.05, hit.distance-0.18); me.g.visible = dist > 0.8;
-    const pos=camTarget.clone().addScaledVector(dir,dist); if (pos.y>HOUSE.H-0.12){ pos.y=HOUSE.H-0.12; }
+    let pos=camTarget.clone().addScaledVector(dir,dist); if (pos.y>HOUSE.H-0.12){ pos.y=HOUSE.H-0.12; }
+    if (me.sit===BED.seat || (me.dead && onBed(me.x,me.z))){ camTarget.set((BED.x0+BED.x1)/2, 0.5, (BED.z0+BED.z1)/2); pos=new THREE.Vector3(BED.x1+1.25, 2.25, BED.z0-1.0); me.g.visible=true; } // 침대에 누우면 침대 전체가 보이는 구도
     camera.position.lerp(pos, Math.min(1, dt*12)); { const k=drunkK(); if (k>0){ camera.position.x += Math.sin(t*1.1)*k*0.25; camera.position.y += Math.sin(t*1.7)*k*0.1; camera.position.z += Math.cos(t*0.9)*k*0.25; } camera.lookAt(camTarget.x, camTarget.y-0.1, camTarget.z); camera.rotation.z += wob + (k>0 ? Math.sin(t*0.8)*k*0.16 : 0);
       const fov=(innerWidth<innerHeight?72:60) + (k>0 ? Math.sin(t*1.3)*k*7 : 0); if (Math.abs(camera.fov-fov)>0.01){ camera.fov=fov; camera.updateProjectionMatrix(); } }
     if (shake>0.001){ camera.position.x += (Math.random()-.5)*shake*0.25; camera.position.y += (Math.random()-.5)*shake*0.25; camera.rotation.z += (Math.random()-.5)*shake*0.12; shake*=Math.exp(-10*dt); }
