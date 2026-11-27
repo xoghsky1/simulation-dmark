@@ -170,6 +170,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
+  ['1.25','11/27 15:45','🥊 한마바키 창주 고무고무 피스톨 (원거리 주먹)'],
   ['1.24','11/27 15:34','🏃 달리기 (방향키 두 번 연타 · 조이스틱 끝까지)'],
   ['1.23','11/27 15:32','☠️ 우측 상단 킬 피드'],
   ['1.22','11/27 15:31','🧸 소파 인형'],
@@ -208,7 +209,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127r';
+window.APP_VER='v20261127s';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -984,7 +985,7 @@ const NPC = (()=>{
     av.arm.children.forEach(m=>{ if (m.geometry && m.geometry.type==='CapsuleGeometry') m.material=on?skin:shirtMat; }); }
   function setRage(on){ if (rage===on) return; rage=on; if (!on){ angry=null; chase=null; } muscle(on); av.g.scale.setScalar(on?1.3:1); ring.visible=on; av.setName(on?'💪 한마바키 창주':'창주');
     if (on){ av.setHp(100); av.say('다 덤벼라!!! 💢'); av.pop('💢💢💢','#ff3b30',true,2.2); sys('💪 창주 한마바키 모드! 1분 동안 아무나 공격해요. 쓰러뜨리면 1분 버프!'); toast('💪 한마바키 모드 발동!'); if (navigator.vibrate) try{ navigator.vibrate([80,60,80]); }catch{} }
-    else { angry=null; chase=null; } }
+    else { angry=null; chase=null; gomu=null; gomuShow(false); gLine.visible=false; } }
   function rageTick(){ const now=Date.now(), slot=Math.floor(now/RAGE_EVERY), inWin=(now%RAGE_EVERY)<RAGE_LEN;
     if (inWin && rageDone!==slot && !av.dead){ rageSlot=slot; setRage(true); }
     else if (rage && (!inWin || rageDone===slot)){ const quiet=rageDone!==slot; setRage(false); if (quiet){ av.say('하… 진정됐다'); sys('😮‍💨 한마바키 모드 끝. 아무도 못 쓰러뜨렸어요'); } }
@@ -1004,11 +1005,40 @@ const NPC = (()=>{
       if (!was){ av.say(RAGE[Math.floor(Math.random()*RAGE.length)]); av.pop('💢','#ff3b30',true,1.9); }
       av.ry=Math.atan2(attacker.x-av.x, attacker.z-av.z); } }
   function angryTarget(){ if (!angry) return null; if (angry.id===myId) return me; const o=others.get(angry.id); return o ? o.av : null; }
+  // 고무고무 주먹: 한마바키 모드에서 멀리 있는 사람한테 팔을 쭉 늘려서 때림 (0.8초 예고 → 발사)
+  const gomuMat=new THREE.MeshToonMaterial({ color:'#c98a55' });
+  const gArm=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,1,12), gomuMat); gArm.visible=false; scene.add(gArm);
+  const gFist=new THREE.Mesh(new THREE.SphereGeometry(0.2,16,12), gomuMat); gFist.visible=false; scene.add(gFist);
+  const gLine=new THREE.Mesh(new THREE.PlaneGeometry(1,0.5), new THREE.MeshBasicMaterial({ color:'#ff3b30', transparent:true, opacity:0.35, depthWrite:false, side:THREE.DoubleSide })); gLine.rotation.x=-Math.PI/2; gLine.visible=false; scene.add(gLine);
+  let gomu=null, gomuNext=0;
+  function gomuShow(on){ gArm.visible=gFist.visible=on; }
+  function gomuTick(dt, tg, d, nowP){
+    if (!gomu){
+      if (nowP<gomuNext || d<2.4 || d>9 || bottleWall(cx,cz,tg.x,tg.z)) return false;
+      const ux=(tg.x-cx)/d, uz=(tg.z-cz)/d; gomu={ t:0, ux, uz, len:Math.min(9.5, d+0.8), hit:false }; gomuNext=nowP+5500;
+      av.ry=Math.atan2(ux,uz); av.moving=false; av.say('고무고무…!! 💢'); av.pop('⚠️','#ffcc00',true,2.3);
+      gLine.visible=true; gLine.scale.set(gomu.len,1,1); gLine.position.set(cx+ux*gomu.len/2, 0.03, cz+uz*gomu.len/2); gLine.rotation.z=Math.atan2(uz,ux)*-1; gLine.rotation.set(-Math.PI/2,0,-Math.atan2(uz,ux));
+      return true; }
+    const g=gomu; g.t+=dt; av.moving=false; av.ry=Math.atan2(g.ux,g.uz);
+    const T1=0.8, T2=T1+0.22, T3=T2+0.2, T4=T3+0.3; let ext=0;
+    if (g.t<T1){ gLine.material.opacity=0.2+0.3*Math.abs(Math.sin(g.t*14)); return true; }
+    if (g.t<T2){ ext=(g.t-T1)/(T2-T1); if (!g.shout){ g.shout=true; av.say('피스톨!!! 👊'); if (near(av)) swoosh(); } }
+    else if (g.t<T3){ ext=1; if (!g.hit){ g.hit=true; gLine.visible=false;
+        const fx=cx+g.ux*g.len, fz=cz+g.uz*g.len;
+        if (me && !me.dead){ const px=me.x-cx, pz=me.z-cz, along=px*g.ux+pz*g.uz, side=Math.abs(px*g.uz-pz*g.ux); if (along>0.3 && along<g.len+0.4 && side<0.55){ applyHit(me,'gomu',av); send('npcatk',{type:'gomu'}); } }
+        if (near({x:fx,z:fz})) thump(true); } }
+    else if (g.t<T4){ ext=1-(g.t-T3)/(T4-T3); }
+    else { gomu=null; gomuShow(false); gLine.visible=false; return false; }
+    const sh=new THREE.Vector3(cx+Math.cos(av.ry)*0.32*1.3, 1.15, cz-Math.sin(av.ry)*0.32*1.3); const L=Math.max(0.05, g.len*ext);
+    const tip=new THREE.Vector3(sh.x+g.ux*L, 1.05, sh.z+g.uz*L);
+    gomuShow(true); gArm.position.copy(sh).add(tip).multiplyScalar(0.5); gArm.scale.set(1,sh.distanceTo(tip),1); gArm.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), tip.clone().sub(sh).normalize()); gFist.position.copy(tip);
+    return true; }
   function updateAngry(dt){
     const tg=angryTarget(); const nowP=performance.now();
     if (rage && (!tg || tg.dead || nowP>angry.until)){ angry=null; chase=null; const n=nearestPlayer(); if (n){ angry={ id:n.id, until:nowP+5000 }; rageNext=nowP+2000; } else { av.moving=false; av.x=cx; av.z=cz; return true; } return true; }
     if (!tg || tg.dead || nowP>angry.until || Math.hypot(tg.x-cx, tg.z-cz)>20){ const line = tg && tg.dead ? '까불고 있어 🤨' : '흥, 봐준다'; calm(line); return false; }
     const d=Math.hypot(tg.x-cx, tg.z-cz);
+    if (rage && gomuTick(dt, tg, d, nowP)){ av.x=cx; av.z=cz; return true; }
     if (d>(rage?1.1:0.95)){
       chaseT-=dt; if (chaseT<=0 || !chase){ chaseT=0.6; chase=path([cx,cz],[tg.x,tg.z]); if (chase.length>1) chase.shift(); }
       let wp=chase[0]||[tg.x,tg.z]; if (Math.hypot(wp[0]-cx, wp[1]-cz)<0.15 && chase.length>1){ chase.shift(); wp=chase[0]; }
@@ -1042,7 +1072,7 @@ const NPC = (()=>{
     cx=av.x; cz=av.z;
     av.tick(dt, t);
   }
-  return { av, update, hit, showAtk, get angry(){ return angry; }, get rage(){ return rage; }, get route(){ if (!route) build(); return route; } };
+  return { av, update, hit, showAtk, get angry(){ return angry; }, get rage(){ return rage; }, get gomu(){ return gomu; }, get cpos(){ return [cx,cz]; }, get route(){ if (!route) build(); return route; } };
 })();
 /* 한마바키 창주 격파 전리품: 1분 버프 (공격 2배 + 이동 1.5배) */
 function rageLoot(){ record('rage_ko',1); me.setBuff(Date.now()+60000); sendMove(true); scheduleTrack();
@@ -1258,7 +1288,7 @@ function updatePoopBtn(){ const show = me && !me.dead && (me.sit===TOILET.seat |
   if (wantPoop===true && me && me.sit===TOILET.seat){ wantPoop=false; poop(); }
   if (wantPoop===true && !target && me && me.sit!==TOILET.seat) wantPoop=false; }
 /* ---------------- 싸움: 펀치/발차기, HP, KO, 부활 ---------------- */
-const ATTACKS = { punch:{dmg:10, range:1.05, cd:0.45, dur:0.4, kb:0.65, label:'퍽!'}, kick:{dmg:18, range:1.35, cd:1.0, dur:0.55, kb:1.4, label:'빡!'}, bottle:{dmg:25, range:0, cd:0.8, dur:0.4, kb:1.1, label:'쨍그랑!'} };
+const ATTACKS = { punch:{dmg:10, range:1.05, cd:0.45, dur:0.4, kb:0.65, label:'퍽!'}, kick:{dmg:18, range:1.35, cd:1.0, dur:0.55, kb:1.4, label:'빡!'}, bottle:{dmg:25, range:0, cd:0.8, dur:0.4, kb:1.1, label:'쨍그랑!'}, gomu:{dmg:22, range:0, cd:0, dur:0.5, kb:2.2, label:'고무고무 피스톨!'} };
 let shake = 0, hitStopUntil = 0;
 /* 피 튀기기: 파티클 + 바닥 핏자국 */
 const bloodParts = [], bloodDecals = [];
@@ -1353,7 +1383,7 @@ function applyHit(victim, type, attacker){
     if (victim===NPC.av) NPC.hit(attacker, type); else if (victim.hp<=0) victim.dead=true;
   }
 }
-const KF_ICON={ punch:'👊', kick:'🦶', bottle:'🍾', faint:'🍶💫' };
+const KF_ICON={ punch:'👊', kick:'🦶', bottle:'🍾', faint:'🍶💫', gomu:'🥊💨' };
 function killFeed(by, w, victim){ const box=$('kfeed'); if (!box) return; const d=document.createElement('div');
   const mine = me && (by===me.name || victim===me.name); if (mine) d.className='me';
   const a=document.createElement('span'); a.className='a'; a.textContent=String(by||'').slice(0,14); const ic=document.createElement('span'); ic.className='w'; ic.textContent=KF_ICON[w]||'💥'; const v=document.createElement('span'); v.className='v'; v.textContent=String(victim||'').slice(0,14);
