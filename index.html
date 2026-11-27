@@ -148,7 +148,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127c';
+window.APP_VER='v20261127e';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -580,7 +580,7 @@ class Avatar {
   updateTag(){
     if (this.tag){ this.g.remove(this.tag); this.tag.material.map.dispose(); this.tag.material.dispose(); }
     const label = this.name + (this.drinks ? `  🥃${this.drinks}` : '');
-    const ttl = this.id==='npc' ? '' : titlesFor(this.name); this.ttl = ttl; const TH = ttl ? 38 : 0;
+    const ttl = this.id==='npc' ? '' : titlesFor(this.name, this); this.ttl = ttl; const TH = ttl ? 38 : 0;
     const c=document.createElement('canvas'), g=c.getContext('2d'); const font='bold 30px "Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif'; const tfont='bold 24px "Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif';
     g.font=font; let w=Math.ceil(Math.max(150, g.measureText(label).width+30)); if (ttl){ g.font=tfont; w=Math.max(w, Math.ceil(g.measureText(ttl).width+30)); } c.width=w; c.height=66+TH;
     if (ttl){ g.fillStyle='rgba(120,70,0,.85)'; g.beginPath(); g.roundRect ? g.roundRect(4,0,w-8,34,12) : g.rect(4,0,w-8,34); g.fill(); g.font=tfont; g.textAlign='center'; g.textBaseline='middle'; g.fillStyle='#ffd54a'; g.fillText(ttl,w/2,18); }
@@ -592,6 +592,13 @@ class Avatar {
   }
   setHp(h){ h=clamp(Math.round(num(h,100)),0,100); if (h!==this.hp){ this.hp=h; this.updateTag(); } }
   setName(n){ if (n!==this.name){ this.name=n; this.updateTag(); } }
+  setBuff(until){ until=num(until); const on=until>Date.now(); this.buffUntil=until; if (!!this.buff===on) return;
+    if (on){ const b=this.buff=new THREE.Group(); const m=new THREE.MeshBasicMaterial({ color:'#ffb300', transparent:true, opacity:0.75, side:THREE.DoubleSide, depthWrite:false });
+      const r1=new THREE.Mesh(new THREE.RingGeometry(0.34,0.46,36), m); r1.rotation.x=-Math.PI/2; r1.position.y=0.03; b.add(r1);
+      const col=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,1.6,24,1,true), new THREE.MeshBasicMaterial({ color:'#ffcc33', transparent:true, opacity:0.13, side:THREE.DoubleSide, depthWrite:false })); col.position.y=0.8; b.add(col);
+      this.g.add(b); }
+    else { this.g.remove(this.buff); this.buff=null; }
+    this.updateTag(); }
   setDrinks(d){ d=clamp(Math.floor(num(d)),0,999); if (d!==this.drinks){ this.drinks=d; this.updateTag(); } }
   setFill(f){ this.fill=clamp(num(f),0,1); this.liquid.visible=this.fill>0.02; this.liquid.scale.y=Math.max(0.05,this.fill); this.liquid.position.y=-0.03+0.0275*this.fill; }
   say(text){
@@ -690,10 +697,10 @@ let channel = null, online = false;
 let lastSend = 0, lastTrack = 0, trackTimer = null, wasMoving = false;
 function sendInterval(){ const n = others.size + 1; return clamp(n*n*0.3/60, 0.15, 2.0) * 1000; }
 function send(event, payload){ if (!channel || !online) return; channel.send({ type:'broadcast', event, payload: { ...payload, id: myId } }).catch(()=>{}); }
-function myState(){ return { name: me.name, color: me.color, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), sit: me.sit, drinks: me.drinks, fill: me.fill, hp: me.hp, fz: faintUntil?1:0 }; }
+function myState(){ return { name: me.name, color: me.color, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), sit: me.sit, drinks: me.drinks, fill: me.fill, hp: me.hp, fz: faintUntil?1:0, bf: me.buffUntil||0 }; }
 function sendMove(force=false){
   const now=performance.now(); if (!force && now-lastSend < sendInterval()) return; lastSend=now;
-  const p = { x:+me.x.toFixed(2), z:+me.z.toFixed(2), ry:+me.ry.toFixed(2), vx:+(me.vx||0).toFixed(2), vz:+(me.vz||0).toFixed(2), sit:me.sit, hp:me.hp, fz: faintUntil?1:0 };
+  const p = { x:+me.x.toFixed(2), z:+me.z.toFixed(2), ry:+me.ry.toFixed(2), vx:+(me.vx||0).toFixed(2), vz:+(me.vz||0).toFixed(2), sit:me.sit, hp:me.hp, fz: faintUntil?1:0, bf: me.buffUntil||0 };
   if (target){ p.tx=+target.x.toFixed(2); p.tz=+target.z.toFixed(2); p.ts=target.seat; }
   send('mv', p); scheduleTrack();
 }
@@ -714,6 +721,7 @@ function applyPresence(){
   for (const key in ps){ const metas = ps[key]; if (!metas || !metas.length || key===myId) continue; const st = metas[metas.length-1]; seen.add(key);
     const isNew = !others.has(key); const o = getOther(key, st);
     o.av.setName(String(st.name||'손님').slice(0,12)); o.av.setDrinks(Math.max(o.av.drinks, num(st.drinks))); if (isNew) o.av.setFill(st.fill);
+    if (num(st.bf)>(o.av.buffUntil||0)) o.av.setBuff(Math.min(num(st.bf), Date.now()+61000));
     if (isNew){ o.av.setHp(st.hp); o.av.dead = o.av.hp<=0 || st.fz===1; o.av.sit = Number.isInteger(st.sit) && seats[st.sit] ? st.sit : -1; if (o.av.sit>=0){ o.av.x=seats[o.av.sit].x; o.av.z=seats[o.av.sit].z; o.av.ry=seats[o.av.sit].ry; } }
     else if (!o.net && !o.target){ o.av.sit = Number.isInteger(st.sit) && seats[st.sit] ? st.sit : -1; }
     if (isNew && joinedAt && performance.now()-joinedAt > 2500) sys(`${o.av.name} 님이 들어왔어요 🙌`);
@@ -733,6 +741,7 @@ function connect(){
     if (!p || p.id===myId || typeof p.id!=='string') return; const o=getOther(p.id); o.lastSeen=performance.now();
     const x=clamp(num(p.x),0,HOUSE.W), z=clamp(num(p.z),0,HOUSE.D);
     if (typeof p.hp==='number'){ o.av.setHp(p.hp); o.av.dead = o.av.hp<=0 || p.fz===1; }
+    if (num(p.bf)>(o.av.buffUntil||0)) o.av.setBuff(Math.min(num(p.bf), Date.now()+61000));
     if (p.tx!=null){ o.target={ x:clamp(num(p.tx),0,HOUSE.W), z:clamp(num(p.tz),0,HOUSE.D), seat: Number.isInteger(p.ts)&&seats[p.ts]?p.ts:-1 }; o.net=null; o.av.sit=-1;
       if (Math.hypot(o.av.x-x,o.av.z-z)>1.2){ o.av.x=x; o.av.z=z; } }
     else { o.target=null; o.net={ x, z, vx:clamp(num(p.vx),-3,3), vz:clamp(num(p.vz),-3,3), ry:num(p.ry), t:performance.now() };
@@ -823,23 +832,34 @@ const NPC = (()=>{
   // 분노 모드: 맞으면 때린 사람을 쫓아가서 반격
   let angry=null, chase=null, chaseT=0, npcAtkReady=0, koStart=0, cx=0, cz=0;
   const RAGE=['💢 너 이리 와!!','죽었어 넌','어딜 도망가','창주 화났다 😡'];
-  function calm(line){ if (!angry) return; angry=null; chase=null; av.setName(rage?'🔥 광폭 창주':'창주'); if (line) av.say(line); }
+  function calm(line){ if (!angry) return; angry=null; chase=null; av.setName(rage?'💪 한마바키 창주':'창주'); if (line) av.say(line); }
   // 광폭화: 5분마다(시계 기준이라 모두 같은 시각) 1분간. 크고 빠르고 세짐, 가까운 사람 아무나 공격, 받는 피해 절반
   const RAGE_EVERY=300000, RAGE_LEN=60000; let rage=false, rageSlot=-1, rageDone=-1, rageNext=0;
   const ring=new THREE.Mesh(new THREE.RingGeometry(0.45,0.62,40), new THREE.MeshBasicMaterial({ color:'#ff3b30', transparent:true, opacity:0.7, side:THREE.DoubleSide, depthWrite:false })); ring.rotation.x=-Math.PI/2; ring.position.y=0.02; ring.visible=false; av.g.add(ring);
-  function setRage(on){ if (rage===on) return; rage=on; if (!on){ angry=null; chase=null; } av.g.scale.setScalar(on?1.3:1); ring.visible=on; av.setName(on?'🔥 광폭 창주':'창주');
-    if (on){ av.setHp(100); av.say('🔥 다 덤벼!!! 🔥'); av.pop('💢💢💢','#ff3b30',true,2.2); sys('🔥 창주 광폭화! 1분 동안 아무나 공격해요. 쓰러뜨리면 🎁 전리품!'); toast('🔥 창주 광폭화!'); if (navigator.vibrate) try{ navigator.vibrate([80,60,80]); }catch{} }
+  // 한마바키 모드 근육 몸
+  const torso=av.body.children.find(m=>m.geometry&&m.geometry.type==='CapsuleGeometry'&&m.geometry.parameters.radius>0.15); const shirtMat=torso.material; const arm2=av.body.children.find(m=>m.geometry&&m.geometry.type==='CapsuleGeometry'&&Math.abs(m.position.x+0.21)<0.01);
+  const skin=new THREE.MeshPhongMaterial({ color:'#c98a55', shininess:60, specular:'#5a3a20' }), skinD=new THREE.MeshPhongMaterial({ color:'#b07444', shininess:50 });
+  const musc=new THREE.Group(); musc.visible=false; av.body.add(musc);
+  for (const sx of [-1,1]){ const pec=new THREE.Mesh(new THREE.SphereGeometry(0.11,14,10), skin); pec.scale.set(1.05,0.75,0.45); pec.position.set(sx*0.1,0.83,0.205); musc.add(pec);
+    const del=new THREE.Mesh(new THREE.SphereGeometry(0.1,14,10), skin); del.position.set(sx*0.3,0.9,0); musc.add(del);
+    const trap=new THREE.Mesh(new THREE.SphereGeometry(0.08,12,8), skin); trap.scale.set(1.3,0.7,1); trap.position.set(sx*0.13,0.99,-0.02); musc.add(trap);
+    for (let r=0;r<3;r++){ const ab=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.06,0.04), skinD); ab.position.set(sx*0.042,0.68-r*0.075,0.225); musc.add(ab); } }
+  function muscle(on){ musc.visible=on; torso.material=on?skin:shirtMat; torso.scale.set(on?1.4:1, on?1.05:1, on?1.2:1);
+    av.arm.scale.set(on?1.9:1,1,on?1.9:1); av.arm.position.x=on?0.3:0.21; if (arm2){ arm2.scale.set(on?1.9:1,1,on?1.9:1); arm2.position.x=on?-0.3:-0.21; arm2.material=on?skin:shirtMat; }
+    av.arm.children.forEach(m=>{ if (m.geometry && m.geometry.type==='CapsuleGeometry') m.material=on?skin:shirtMat; }); }
+  function setRage(on){ if (rage===on) return; rage=on; if (!on){ angry=null; chase=null; } muscle(on); av.g.scale.setScalar(on?1.3:1); ring.visible=on; av.setName(on?'💪 한마바키 창주':'창주');
+    if (on){ av.setHp(100); av.say('다 덤벼라!!! 💢'); av.pop('💢💢💢','#ff3b30',true,2.2); sys('💪 창주 한마바키 모드! 1분 동안 아무나 공격해요. 쓰러뜨리면 1분 버프!'); toast('💪 한마바키 모드 발동!'); if (navigator.vibrate) try{ navigator.vibrate([80,60,80]); }catch{} }
     else { angry=null; chase=null; } }
   function rageTick(){ const now=Date.now(), slot=Math.floor(now/RAGE_EVERY), inWin=(now%RAGE_EVERY)<RAGE_LEN;
     if (inWin && rageDone!==slot && !av.dead){ rageSlot=slot; setRage(true); }
-    else if (rage && (!inWin || rageDone===slot)){ const quiet=rageDone!==slot; setRage(false); if (quiet){ av.say('하… 진정됐다'); sys('😮‍💨 창주 광폭화 끝. 아무도 못 쓰러뜨렸어요'); } }
+    else if (rage && (!inWin || rageDone===slot)){ const quiet=rageDone!==slot; setRage(false); if (quiet){ av.say('하… 진정됐다'); sys('😮‍💨 한마바키 모드 끝. 아무도 못 쓰러뜨렸어요'); } }
     if (rage && !angry || rage && angry && performance.now()>rageNext){ rageNext=performance.now()+2000; const tg=nearestPlayer(); if (tg) angry={ id:tg.id, until:performance.now()+5000 }; } }
   function nearestPlayer(){ let best=null, bd=14; const all=[]; if (me) all.push(me); others.forEach(o=>all.push(o.av)); for (const p of all){ if (p.dead || p.fz) continue; const d=Math.hypot(p.x-cx, p.z-cz); if (d<bd){ bd=d; best=p; } } return best; }
   function showAtk(type){ const A=ATTACKS[type]; av.atk=A.dur; av.atkDur=A.dur; av.atkType=type; if (near(av)) swoosh(); }
   function hit(attacker){
     const nowP=performance.now();
     if (av.hp<=0){ const wasRage=rage; if (rage){ rageDone=rageSlot; setRage(false); } av.dead=true; koUntil=nowP+5000; calm();
-      if (wasRage){ sys(`🏆 광폭 창주 격파!${attacker&&attacker.name?' ('+attacker.name+')':''}`); if (attacker===me) rageLoot(); } av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`);
+      if (wasRage){ sys(`🏆 한마바키 창주 격파!${attacker&&attacker.name?' ('+attacker.name+')':''}`); if (attacker && attacker!==me && attacker.setBuff) attacker.setBuff(Date.now()+60000); if (attacker===me) rageLoot(); } av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`);
       if (attacker===me){ record('npc_ko',1); if (koStart) record('npc_ko_sec', Math.max(1, (nowP-koStart)/1000)); }
       koStart=0; return; }
     if (!koStart) koStart=nowP;
@@ -889,8 +909,10 @@ const NPC = (()=>{
   }
   return { av, update, hit, showAtk, get angry(){ return angry; }, get rage(){ return rage; }, get route(){ if (!route) build(); return route; } };
 })();
-/* 광폭 창주 전리품 (무엇을 줄지 정해지면 여기서 지급) */
-function rageLoot(){ record('rage_ko',1); toast('🎁 광폭 창주 격파! 전리품은 곧 공개'); }
+/* 한마바키 창주 격파 전리품: 1분 버프 (공격 2배 + 이동 1.5배) */
+function rageLoot(){ record('rage_ko',1); me.setBuff(Date.now()+60000); sendMove(true); scheduleTrack();
+  toast('💪 전리품: 1분 버프! 공격 2배 + 빨라짐'); sys(`💪 ${me.name}님 1분 버프 획득 (공격 2배 + 빨라짐)`); }
+setInterval(()=>{ const all=[]; if (me) all.push(me); others.forEach(o=>all.push(o.av)); all.forEach(av=>{ if (av.buff && av.buffUntil<=Date.now()){ av.setBuff(0); if (av===me) toast('버프 끝 💤'); } if (av.buff) av.buff.rotation.y+=0.3; }); }, 1000);
 /* ---------------- 기록 & 랭킹판 (Supabase에 저장, 방별) ---------------- */
 let firstShotAt=0, cleanStart=false, blackoutDone=false, board=null;
 function record(kind, value){ if (!SBC || !me) return; try { SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>setTimeout(loadBoard, 600), ()=>{}); } catch {} }
@@ -908,8 +930,8 @@ const BOARD_SECTIONS = [
 ];
 // 1등 칭호 (이름표 위에 표시)
 const TITLE_OF = { blackoutCnt:'🌀 필름 수집가', poopCnt:'🚽 변기 지박령', npcKo:'🥊 창주 천적' };
-function titlesFor(name){ if (!board) return ''; const t=[]; for (const k in TITLE_OF){ const r=(board[k]||[])[0]; if (r && String(r.name)===String(name).slice(0,20)) t.push(TITLE_OF[k]); } return t.join(' '); }
-function refreshTitles(){ const all=[]; if (me) all.push(me); others.forEach(o=>all.push(o.av)); all.forEach(av=>{ if ((av.ttl||'')!==titlesFor(av.name)) av.updateTag(); }); }
+function titlesFor(name, av){ const t=[]; if (av && av.buff) t.push('💪 버프: 공격 2배'); if (!board) return t.join(' '); for (const k in TITLE_OF){ const r=(board[k]||[])[0]; if (r && String(r.name)===String(name).slice(0,20)) t.push(TITLE_OF[k]); } return t.join(' '); }
+function refreshTitles(){ const all=[]; if (me) all.push(me); others.forEach(o=>all.push(o.av)); all.forEach(av=>{ if ((av.ttl||'')!==titlesFor(av.name, av)) av.updateTag(); }); }
 const boardCv=document.createElement('canvas'); boardCv.width=1280; boardCv.height=800; const boardTex=new THREE.CanvasTexture(boardCv); boardTex.colorSpace=THREE.SRGBColorSpace;
 { const bw=2.7, bh=1.69; const fr=new THREE.Mesh(new THREE.BoxGeometry(bw+0.08,bh+0.08,0.04), mat('#3a2a1c')); const bz=5.57*SCALE-T/2-0.03, bx=11.25;
   fr.position.set(bx,1.5,bz); scene.add(fr); const pl=new THREE.Mesh(new THREE.PlaneGeometry(bw,bh), new THREE.MeshBasicMaterial({ map:boardTex })); pl.rotation.y=Math.PI; pl.position.set(bx,1.5,bz-0.025); scene.add(pl); }
@@ -1080,7 +1102,7 @@ function applyHit(victim, type, attacker){
   if (victim===me || attacker===me) lastCombat=performance.now();
   const A=ATTACKS[type]; if (!A || !victim || victim.dead) return;
   const dx=victim.x-attacker.x, dz=victim.z-attacker.z, d=Math.hypot(dx,dz)||1, ux=dx/d, uz=dz/d;
-  const dmg = Math.round(A.dmg * (victim===NPC.av && NPC.rage ? 0.5 : 1) * (attacker===NPC.av && NPC.rage ? 1.5 : 1));
+  const dmg = Math.round(A.dmg * (victim===NPC.av && NPC.rage ? 0.5 : 1) * (attacker===NPC.av && NPC.rage ? 1.5 : 1) * (attacker && attacker.buff ? 2 : 1));
   victim.flash=0.45; victim.hitT=0.35; victim.setHp(victim.hp - dmg);
   victim.pop(`${A.label} -${dmg}`, '#ff3b30', true, 1.75); victim.pop('💥', '#fff', true, type==='kick'?0.7:1.05);
   spawnBlood(victim.x+ux*-0.1, type==='kick'?0.75:1.12, victim.z+uz*-0.1, ux, uz, type==='kick'?22:14);
@@ -1223,6 +1245,7 @@ function step(){
     else if (target){ const dx=target.x-me.x, dz=target.z-me.z, d=Math.hypot(dx,dz);
       if (d<0.06 || (d<0.35 && target.seat>=0)){ if (target.seat>=0){ const s=seats[target.seat]; if (!seatTakenBy(target.seat)){ me.sit=target.seat; me.x=s.x; me.z=s.z; me.ry=s.ry; camYaw=s.ry+Math.PI; camPitch=Math.max(camPitch,0.5); target=null; } else { const j=nearestFreeSeat(me.x,me.z); target = j>=0 ? {x:seats[j].x,z:seats[j].z,seat:j} : null; if (j<0) toast('빈 자리가 없어요'); } } else target=null; sendMove(true); updateHUD(); }
       else { const sp=Math.min(SPEED, d/dt); vx=dx/d*sp; vz=dz/d*sp; } }
+    if (me.buff){ vx*=1.5; vz*=1.5; }
     if (vx||vz){ const sx=target&&target.seat>=0; const nx=me.x+vx*dt, nz=me.z+vz*dt;
       if (sx && Math.hypot(target.x-me.x,target.z-me.z)<0.6){ me.x=nx; me.z=nz; } else { const px=me.x, pz=me.z; [me.x,me.z]=collide(nx,nz); if (target){ if (Math.hypot(me.x-px,me.z-pz) < Math.hypot(vx,vz)*dt*0.25) stuckT+=dt; else stuckT=Math.max(0,stuckT-dt); if (stuckT>0.8){ stuckT=0; if (target.seat>=0){ const s=seats[target.seat]; me.x=s.x; me.z=s.z; } else target=null; } } }
       me.ry=Math.atan2(vx,vz); }
