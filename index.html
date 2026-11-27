@@ -101,7 +101,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <div id="wb"><div id="wbBar">
   <button class="col on" data-c="#1d1d1f" style="background:#1d1d1f"></button><button class="col" data-c="#e53935" style="background:#e53935"></button><button class="col" data-c="#1e6fe0" style="background:#1e6fe0"></button><button class="col" data-c="#2e9d4a" style="background:#2e9d4a"></button><button class="col" data-c="#f39c12" style="background:#f39c12"></button><button class="col" data-c="#8e44ad" style="background:#8e44ad"></button>
   <button id="wbThin" class="on">가늘게</button><button id="wbThick">굵게</button><button id="wbErase">🧽 지우개</button><button id="wbClear">🗑 전체 지우기</button><button id="wbClose">✕ 닫기 (B)</button>
-</div><canvas id="wbc"></canvas><div id="wbInfo">그린 건 자동 저장돼서 모두에게 보여요</div></div>
+</div><canvas id="wbc"></canvas><div id="wbInfo">✍️ 방명록: 쓴 건 자동 저장돼서 모두에게 보여요</div></div>
 <div id="rank" class="hud panel"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">🏆 명예의 전당</b><button id="rankClose">✕</button></div><div id="rankBody"></div></div>
 <div id="help" class="hud panel">
   <b style="color:var(--text)">조작법</b><br>
@@ -114,7 +114,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <div id="chatlog" class="hud"></div>
 <div id="joy" class="hud panel"><i></i></div>
 <div id="actions" class="hud">
-  <button id="aWb" style="display:none" data-key="B" title="단축키 B"><span>🖍️</span>화이트보드</button>
+  <button id="aWb" style="display:none" data-key="B" title="단축키 B"><span>✍️</span>방명록 쓰기</button>
   <button id="aPoop" style="display:none" data-key="P" title="단축키 P"><span>💩</span>똥싸기</button>
   <button id="aPour" data-key="1" title="단축키 1"><span>🍶</span>따르기</button>
   <button id="aCheers" data-key="2" title="단축키 2"><span>🥂</span>짠!</button>
@@ -148,7 +148,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127e';
+window.APP_VER='v20261127f';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -963,6 +963,11 @@ const wbTexCv=document.createElement('canvas'); wbTexCv.width=1024; wbTexCv.heig
   const pl=new THREE.Mesh(new THREE.PlaneGeometry(WB.w, WB.h), new THREE.MeshBasicMaterial({ map:wbTex })); pl.rotation.y=Math.PI/2; pl.position.set(WB.x+0.017, WB.y, WB.z); scene.add(pl);
   const tray=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.025,WB.w*0.9), mat('#9aa0a6')); tray.position.set(WB.x+0.04, WB.y-WB.h/2-0.03, WB.z); scene.add(tray);
   [['#e53935',-0.2],['#1e6fe0',-0.1],['#1d1d1f',0]].forEach(([c,o])=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.1,8), mat(c)); m.rotation.x=Math.PI/2; m.position.set(WB.x+0.045, WB.y-WB.h/2-0.008, WB.z+o); scene.add(m); }); }
+{ const c=document.createElement('canvas'); c.width=1024; c.height=200; const g=c.getContext('2d'); const F='"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif';
+  g.fillStyle='#2f5f8f'; g.beginPath(); g.roundRect ? g.roundRect(8,8,1008,184,36) : g.rect(8,8,1008,184); g.fill(); g.strokeStyle='#ffd54a'; g.lineWidth=8; g.stroke();
+  g.fillStyle='#fff'; g.textAlign='center'; g.textBaseline='middle'; g.font=`900 92px ${F}`; g.fillText('✍️ 방명록 쓰기', 512, 86); g.font=`bold 40px ${F}`; g.fillStyle='#ffe9a8'; g.fillText('가까이 와서 B 키 또는 🖍️ 버튼', 512, 160);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; const sg=new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.332), new THREE.MeshBasicMaterial({ map:t, transparent:true }));
+  sg.rotation.y=Math.PI/2; sg.position.set(WB.x+0.02, WB.y+WB.h/2+0.23, WB.z); scene.add(sg); }
 function wbStroke(g, s, k){ const p=s.p; if (!p || p.length<2) return; g.strokeStyle=s.c; g.lineWidth=s.w*k; g.lineCap='round'; g.lineJoin='round'; g.beginPath(); g.moveTo(p[0]*k, p[1]*k);
   if (p.length===2) g.lineTo(p[0]*k+0.01, p[1]*k); else for (let i=2;i<p.length;i+=2) g.lineTo(p[i]*k, p[i+1]*k); g.stroke(); }
 function wbRender(g, W, H, list){ g.fillStyle='#fff'; g.fillRect(0,0,W,H); const k=W/WB_W; for (const s of list) wbStroke(g, s, k); }
