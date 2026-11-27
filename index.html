@@ -133,6 +133,9 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <div id="joy" class="hud panel"><i></i></div>
 <div id="actions" class="hud">
   <button id="aWb" style="display:none" data-key="B" title="단축키 B"><span>✍️</span>방명록 쓰기</button>
+  <button id="aPet" style="display:none" data-key="Q" title="단축키 Q"><span>🐱</span>쓰다듬기</button>
+  <button id="aChur" style="display:none" data-key="R" title="단축키 R"><span>🍥</span><b id="aChurT">츄르 주기</b></button>
+  <button id="aLie" style="display:none" data-key="L" title="단축키 L"><span>🛏️</span><b id="aLieT">눕기</b></button>
   <button id="aPoop" style="display:none" data-key="P" title="단축키 P"><span>💩</span>똥싸기</button>
   <button id="aShot" data-key="1" title="단축키 1"><span>🥃</span>원샷</button>
   <button class="say" data-say="줴줴이야" data-key="4" title="단축키 4"><span>🗣️</span>줴줴이야</button>
@@ -170,7 +173,8 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
-  ['1.26','11/27 16:00','🛏️ 필름 끊기면 침대에서 일어남 · 옆에 인형이 누워 있음'],
+  ['1.27','11/27 16:25','🐱 냥이 집 안 로밍 · 쓰다듬기/츄르 친밀도 · 1등 따라다님 · 🛏️ 침대 눕기 · 원샷 연타'],
+  ['1.26','11/27 16:00','🛏️ 필름 끊기면 침대에서 인형 옆에 누운 채로 깨어남'],
   ['1.25','11/27 15:45','🥊 한마바키 창주 고무고무 피스톨 (원거리 주먹)'],
   ['1.24','11/27 15:34','🏃 달리기 (방향키 두 번 연타 · 조이스틱 끝까지)'],
   ['1.23','11/27 15:32','☠️ 우측 상단 킬 피드'],
@@ -210,7 +214,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127u';
+window.APP_VER='v20261127v';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -631,6 +635,7 @@ ANC={x:0,z:5.57};
 box(2.0,0.35,1.55,'#d8d8d4',1.1,0.175,4.68,true); box(1.96,0.16,1.5,'#fbfaf7',1.12,0.43,4.68); box(0.4,0.1,1.4,'#ffffff',0.3,0.55,4.68); box(1.1,0.1,1.54,'#ece9e2',1.5,0.52,4.68); box(0.5,0.18,0.6,'#e4e0d6',0.9,0.6,4.3);
 const BED={ x0:AX(0.1), x1:AX(2.1), z0:AZ(3.9), z1:AZ(5.46), sx:AX(1.25), sz:AZ(4.75), wx:AX(1.2), wz:AZ(3.9)-0.45 }; // 필름 끊기면 여기서 눕고 일어남
 if (window.__plush){ const d=window.__plush; d.position.set(BED.sx-0.4, 0.58, BED.sz+0.4); d.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,0,-1), new THREE.Vector3(-1,0,0), new THREE.Vector3(0,1,0))); d.rotateY(-0.35); } // 인형: 필름 끊긴 사람 옆에 나란히 누워 있음
+BED.seat=seats.length; seats.push({ x:BED.sx, z:BED.sz, ry:Math.PI/2, kind:'bed' }); // 눕기 자리 (인형 옆)
 const onBed=(x,z)=>x>BED.x0&&x<BED.x1&&z>BED.z0&&z<BED.z1;
 // 옷방 (거실 아래쪽 방): 흰 행거 두 줄 + 옷
 ANC={x:5.53,z:8.11};
@@ -746,7 +751,7 @@ class Avatar {
   remove(){ scene.remove(this.g); }
   tick(dt, t){
     const seat = this.sit>=0 ? seats[this.sit] : null;
-    const targetY = this.dead ? (onBed(this.x,this.z)?0.57:0.12) : seat ? (seat.kind==='sofa' ? 0.42-0.5 : seat.kind==='toilet' ? 0.46-0.5 : 0.07-0.48) : 0;
+    const targetY = this.dead ? (onBed(this.x,this.z)?0.57:0.12) : seat ? (seat.kind==='bed' ? 0.57 : seat.kind==='sofa' ? 0.42-0.5 : seat.kind==='toilet' ? 0.46-0.5 : 0.07-0.48) : 0;
     this.body.position.y += (targetY - this.body.position.y) * Math.min(1, dt*10);
     this.lean = (this.lean||0) + (((this.moving&&this.run)?0.28:0) - (this.lean||0))*Math.min(1,dt*8);
     if (this.moving){ const r=this.run; this.walk += dt*(r?16:9); this.body.position.y += Math.abs(Math.sin(this.walk))*(r?0.07:0.035); this.body.rotation.z = Math.sin(this.walk)*(r?0.07:0.04);
@@ -772,7 +777,7 @@ class Avatar {
     if (kik>0) this.body.position.y += kik*0.12;
     this.hitT = Math.max(0, this.hitT - dt); const kd=Math.exp(-9*dt); this.kvx*=kd; this.kvz*=kd;
     if (!this.dead && this.hp<40){ this.dripT-=dt; if (this.dripT<=0){ this.dripT=0.5+Math.random()*0.8; spawnBlood(this.x, 1.0, this.z, 0, 0, 1); } }
-    let rx = -kik*0.35 - this.hitT*1.3 + this.lean; if (this.dead) rx = -1.45;
+    let rx = -kik*0.35 - this.hitT*1.3 + this.lean; if (this.dead || (seat && seat.kind==='bed')) rx = -1.45;
     this.body.rotation.x += (rx - this.body.rotation.x) * Math.min(1, dt*(this.dead?6:14));
     this.flash = Math.max(0, this.flash - dt); this.cm.emissive.setRGB(this.flash*2.2, 0, 0);
     if (this.bubble){ this.bubbleT -= dt; if (this.bubbleT<=0){ this.g.remove(this.bubble); this.bubble.material.map.dispose(); this.bubble.material.dispose(); this.bubble=null; } else if (this.bubbleT<0.6) this.bubble.material.opacity=this.bubbleT/0.6; }
@@ -822,8 +827,8 @@ let stuckT = 0;
 let camYaw = Math.PI, camPitch = 0.42, camDist = 3.2;
 
 function seatTakenBy(i){ if (me && me.sit===i) return myId; for (const [id,o] of others) if (o.av.sit===i) return id; return null; }
-function nearestFreeSeat(x,z,cushionOnly=false){ let best=-1, bd=1e9; seats.forEach((s,i)=>{ if (seatTakenBy(i) || (cushionOnly && s.kind!=='cushion')) return; const d=Math.hypot(s.x-x,s.z-z); if (d<bd){bd=d;best=i;} }); return best; }
-function standUp(){ if (me.sit>=0){ const s=seats[me.sit]; me.sit=-1; const away = s.kind==='sofa' ? [-0.6,0] : s.kind==='toilet' ? [Math.sin(s.ry)*0.6, Math.cos(s.ry)*0.6] : [Math.sin(s.ry)*-0.45, Math.cos(s.ry)*-0.45]; [me.x,me.z]=collide(s.x+away[0], s.z+away[1]); sendMove(true); } }
+function nearestFreeSeat(x,z,cushionOnly=false){ let best=-1, bd=1e9; seats.forEach((s,i)=>{ if (seatTakenBy(i) || s.kind==='bed' || (cushionOnly && s.kind!=='cushion')) return; const d=Math.hypot(s.x-x,s.z-z); if (d<bd){bd=d;best=i;} }); return best; }
+function standUp(){ if (me.sit>=0){ const s=seats[me.sit]; me.sit=-1; const away = s.kind==='bed' ? [BED.wx-s.x, BED.wz-s.z] : s.kind==='sofa' ? [-0.6,0] : s.kind==='toilet' ? [Math.sin(s.ry)*0.6, Math.cos(s.ry)*0.6] : [Math.sin(s.ry)*-0.45, Math.cos(s.ry)*-0.45]; [me.x,me.z]=collide(s.x+away[0], s.z+away[1]); sendMove(true); } }
 function goTo(x,z,seat=-1){ if (me.dead) return; if (me.sit>=0) standUp(); target={x,z,seat}; sendMove(true); }
 function sitAt(i){ const s=seats[i]; if (!s) return; if (seatTakenBy(i) && seatTakenBy(i)!==myId){ toast('누가 앉아 있어요'); return; } goTo(s.x, s.z, i); }
 
@@ -909,6 +914,7 @@ function doActEffect(av, type, p, mine){
   else if (type==='jump'){ av.jump=0.6; }
   else if (type==='poop'){ poopFx(av, mine||near); }
   else if (type==='ko'){ av.dead=true; av.setHp(0); if (!mine) killFeed(p&&p.by?String(p.by):'', p&&p.w?String(p.w):'', av.name); sys(`💀 ${av.name} KO!${p && p.by ? ' ('+String(p.by).slice(0,12)+' 승)' : ''}`); }
+  else if (type==='pet' || type==='churu'){ av.raise=0.8; av.pop(type==='churu'?'🍥 츄르 냠':'🐱 쓰담쓰담','#ffc4d6'); if (!mine) CAT.react(type, av); }
   else if (type==='cond'){ av.pop('🧃 컨디션 꿀꺽!','#ffe27a',true,1.6); if (mine||near) gulp(); }
   else if (type==='faint'){ av.dead=true; av.sit=-1; if (p && isFinite(p.x) && isFinite(p.z) && av!==me){ av.x=+p.x; av.z=+p.z; av.ry=Math.PI/2; } av.pop('zZZ 💤','#c9b6ff',true,1.2); sys(`🍺 ${av.name} 필름 끊김… (5병 넘음)`); killFeed('', 'faint', av.name); }
   else if (type==='wake'){ if (av.hp>0) av.dead=false; if (p && isFinite(p.x) && isFinite(p.z) && av!==me){ av.x=+p.x; av.z=+p.z; } av.pop('…여기 어디야','#ffffff'); }
@@ -924,7 +930,7 @@ function act(type){
   scheduleTrack();
 }
 let drinkBusy=false;
-function drinkOne(){ if (!me || me.dead || drinkBusy) return; if (me.fill>=0.1) return act('shot'); act('pour'); drinkBusy=true; setTimeout(()=>{ drinkBusy=false; act('shot'); }, 700); }
+function drinkOne(){ if (!me || me.dead || drinkBusy) return; if (me.fill<0.1) me.setFill(1); act('shot'); drinkBusy=true; setTimeout(()=>{ drinkBusy=false; }, 120); } // 연타하는 대로 바로 원샷
 $('aCheers').onclick=()=>act('cheers'); $('aShot').onclick=drinkOne;
 /* ---------------- NPC 창주: 집 안을 돌아다님 ----------------
    위치는 시계(Date.now)로만 정해져서 서버 없이도 모든 사람 화면에서 같은 자리에 보임 */
@@ -1076,7 +1082,7 @@ const NPC = (()=>{
     cx=av.x; cz=av.z;
     av.tick(dt, t);
   }
-  return { av, update, hit, showAtk, get angry(){ return angry; }, get rage(){ return rage; }, get gomu(){ return gomu; }, get cpos(){ return [cx,cz]; }, get route(){ if (!route) build(); return route; } };
+  return { av, update, hit, showAtk, path:(a,b)=>{ grid(); return path(a,b); }, get angry(){ return angry; }, get rage(){ return rage; }, get gomu(){ return gomu; }, get cpos(){ return [cx,cz]; }, get route(){ if (!route) build(); return route; } };
 })();
 /* 한마바키 창주 격파 전리품: 1분 버프 (공격 2배 + 이동 1.5배) */
 function rageLoot(){ record('rage_ko',1); me.setBuff(Date.now()+60000); sendMove(true); scheduleTrack();
@@ -1100,26 +1106,47 @@ const CAT = (()=>{
     const paw=new THREE.Mesh(new THREE.SphereGeometry(0.026,8,6), white); paw.position.y=-0.07; l.add(paw); }
   const tail=new THREE.Group(); tail.position.set(0,0.24,-0.2); g.add(tail);
   for (let i=0;i<6;i++){ const t=new THREE.Mesh(new THREE.SphereGeometry(0.024-i*0.002,8,6), i%2?furD:fur); t.position.set(0, i*0.045, -i*0.02); tail.add(t); }
-  // 테라스 둘레를 돌아다님 (술상 피해서)
-  const P=[[0.6,10.1],[2.2,10.2],[4.0,10.4],[4.05,12.4],[3.3,13.35],[1.6,13.3],[0.5,12.6],[0.55,11.3]];
-  const acts=['sit','walk','groom','walk','sit','walk','lie','walk'];
-  const SPD=0.45; const route=[]; let T0=0;
-  P.forEach((a,i)=>{ const b=P[(i+1)%P.length]; const w=acts[i]==='walk'?2:6+((i*7)%5); route.push({ k:'wait', t0:T0, t1:T0+w, x:a[0], z:a[1], pose:acts[i]==='walk'?'stand':acts[i] }); T0+=w;
-    const d=Math.hypot(b[0]-a[0],b[1]-a[1]); route.push({ k:'walk', t0:T0, t1:T0+d/SPD, a, b }); T0+=d/SPD; });
-  let bubble=null, bubbleT=0, meowCd=0, ry=0;
+  // 집 안 + 테라스를 시계 기준으로 돌아다님 (모두에게 같은 위치). 친밀도 1등이 접속해 있으면 그 사람을 졸졸 따라다님
+  const S=SCALE, STOPS=[ [[0.6,6.0],'sit'], [[2.3,7.6],'lie'], [[1.5,4.3],'groom'], [[4.9,3.0],'sit'], [[7.0,4.7],'lie'], [[4.6,1.3],'sit'], [[6.4,2.4],'groom'], [[1.4,4.9],'sit'] ].map(([p,pose])=>[[p[0]*S,p[1]*S],pose]);
+  const SPD=0.45; let route=null, T0=0;
+  function buildRoute(){ route=[]; T0=0;
+    STOPS.forEach(([a,pose],i)=>{ const b=STOPS[(i+1)%STOPS.length][0]; const ps=NPC.path(a,b); const w=8+((i*7)%6);
+      route.push({ k:'wait', t0:T0, t1:T0+w, x:ps[0][0], z:ps[0][1], pose }); T0+=w;
+      for (let k=0;k<ps.length-1;k++){ const A=ps[k], B=ps[k+1], d=Math.hypot(B[0]-A[0],B[1]-A[1]); if (d<1e-3) continue; route.push({ k:'walk', t0:T0, t1:T0+d/SPD, a:A, b:B }); T0+=d/SPD; } }); }
+  let bubble=null, bubbleT=0, meowCd=0, ry=0, cx=null, cz=0, fp=null, fpi=0, fpT=0, fpGoal=null, happyT=0, leaderName='';
   function say(text){ if (bubble){ g.remove(bubble); bubble.material.map.dispose(); bubble.material.dispose(); }
     bubble=textSprite([text], { bg:'rgba(255,255,255,.93)', color:'#1a1a1a', font:'28px "Apple SD Gothic Neo","Noto Sans KR",sans-serif', lh:34, scale:0.0034 }); bubble.position.y=0.62; g.add(bubble); bubbleT=3.5; }
   function meowSound(){ const a=audio(); if (!a) return; const t=a.currentTime; const o=a.createOscillator(), f=a.createBiquadFilter(), gn=a.createGain(); o.type='sawtooth';
     o.frequency.setValueAtTime(520,t); o.frequency.linearRampToValueAtTime(900,t+0.18); o.frequency.linearRampToValueAtTime(420,t+0.55); f.type='bandpass'; f.frequency.value=1100; f.Q.value=3;
     gn.gain.setValueAtTime(0.0001,t); gn.gain.exponentialRampToValueAtTime(0.25,t+0.06); gn.gain.exponentialRampToValueAtTime(0.0001,t+0.6); o.connect(f).connect(gn).connect(a.destination); o.start(t); o.stop(t+0.65); }
   const LINES=['야옹~','냐앙 🐾','미야오','골골골… 😺','츄르 없냥?'];
+  function leader(){ const top=board && board.catLove && board.catLove[0]; if (!top) return null; const n=String(top.name); leaderName=n;
+    if (me && me.name===n && !me.dead) return me; for (const o of others.values()) if (o.av && o.av.name===n && !o.av.dead) return o.av; return null; }
+  function react(kind, who){ happyT=2.5; say(kind==='churu' ? '냠냠냠… 💕 츄르 최고냥' : ['골골골… 💕','냐아앙 😻','더 쓰다듬어라냥'][Math.floor(Math.random()*3)]); meowSound();
+    if (who && cx!=null){ const want=Math.atan2(who.x-cx, who.z-cz); ry=want; } }
   function update(dt, t){
+    if (!route) buildRoute();
     const now=(Date.now()/1000)%T0; const r=route.find(q=>now>=q.t0&&now<q.t1)||route[0];
-    let x, z, moving=false, pose='stand';
-    if (r.k==='walk'){ const k=(now-r.t0)/(r.t1-r.t0); x=r.a[0]+(r.b[0]-r.a[0])*k; z=r.a[1]+(r.b[1]-r.a[1])*k; ry=Math.atan2(r.b[0]-r.a[0], r.b[1]-r.a[1]); moving=true; }
-    else { x=r.x; z=r.z; pose=r.pose; }
+    let clx, clz, clMoving=false, clRy=null, pose='stand';
+    if (r.k==='walk'){ const k=(now-r.t0)/(r.t1-r.t0); clx=r.a[0]+(r.b[0]-r.a[0])*k; clz=r.a[1]+(r.b[1]-r.a[1])*k; clRy=Math.atan2(r.b[0]-r.a[0], r.b[1]-r.a[1]); clMoving=true; }
+    else { clx=r.x; clz=r.z; pose=r.pose; }
+    if (cx==null){ cx=clx; cz=clz; }
+    const L=leader(); let moving=false;
+    let goal=null, near=0.25, spd=1.4;
+    if (L){ goal=[L.x - Math.sin(L.ry)*0.0, L.z]; near=0.85; const d=Math.hypot(L.x-cx, L.z-cz); spd = d>3 ? 2.6 : 1.5; }
+    else if (Math.hypot(clx-cx, clz-cz) > 0.3) goal=[clx, clz];
+    if (goal && Math.hypot(goal[0]-cx, goal[1]-cz) > near){
+      fpT-=dt; if (!fp || fpT<=0 || !fpGoal || Math.hypot(goal[0]-fpGoal[0], goal[1]-fpGoal[1])>0.5){ fp=NPC.path([cx,cz], goal); fpi=1; fpT=1; fpGoal=goal; }
+      let step=spd*dt; while (step>0 && fp && fpi<fp.length){ const w=fp[fpi], dx=w[0]-cx, dz=w[1]-cz, dd=Math.hypot(dx,dz);
+        if (L && Math.hypot(goal[0]-cx, goal[1]-cz) <= near) break;
+        if (dd<=step){ cx=w[0]; cz=w[1]; fpi++; step-=dd; } else { cx+=dx/dd*step; cz+=dz/dd*step; step=0; ry=Math.atan2(dx,dz); } }
+      moving=true; pose='stand';
+    } else if (L){ fp=null; pose = happyT>0 ? 'sit' : 'sit'; const want=Math.atan2(L.x-cx, L.z-cz); ry+=Math.atan2(Math.sin(want-ry), Math.cos(want-ry))*Math.min(1,dt*4); }
+    else { fp=null; cx=clx; cz=clz; moving=clMoving; if (clRy!=null) ry=clRy; }
+    if (happyT>0){ happyT-=dt; if (!moving) pose='sit'; }
+    const x=cx, z=cz;
     const nearMe = me && Math.hypot(me.x-x, me.z-z) < 1.4;
-    if (nearMe && !moving){ const want=Math.atan2(me.x-x, me.z-z); ry+=Math.atan2(Math.sin(want-ry), Math.cos(want-ry))*Math.min(1,dt*4); }
+    if (nearMe && !moving && !L){ const want=Math.atan2(me.x-x, me.z-z); ry+=Math.atan2(Math.sin(want-ry), Math.cos(want-ry))*Math.min(1,dt*4); }
     g.position.set(x,0,z); g.rotation.y=ry;
     const sw=moving?Math.sin(t*12):0; legs.forEach((l,i)=>{ l.rotation.x=(i===0||i===3?1:-1)*sw*0.5; });
     const sit=pose==='sit'||pose==='groom', lie=pose==='lie';
@@ -1131,8 +1158,23 @@ const CAT = (()=>{
     if (nearMe && performance.now()>meowCd){ meowCd=performance.now()+9000; say(LINES[Math.floor(Math.random()*LINES.length)]); meowSound(); }
     if (bubble){ bubbleT-=dt; if (bubbleT<=0){ g.remove(bubble); bubble.material.map.dispose(); bubble.material.dispose(); bubble=null; } }
   }
-  return { g, update, get pos(){ return [g.position.x, g.position.z]; } };
+  return { g, update, react, get pos(){ return [g.position.x, g.position.z]; }, get leader(){ const l=leader(); return l?l.name:''; } };
 })();
+// 침대 눕기: 침대 근처에서 버튼 → 인형 옆에 눕기. 움직이거나 다시 누르면 일어남
+const bedNear = () => me && !me.dead && me.sit<0 && me.x>BED.x0-1.2 && me.x<BED.x1+1.2 && me.z>BED.z0-1.2 && me.z<BED.z1+1.2;
+function lieToggle(){ if (!me || me.dead) return; if (me.sit===BED.seat){ standUp(); return; }
+  if (!bedNear()){ toast('침대 옆으로 가서 눌러요 🛏️'); return; } if (seatTakenBy(BED.seat)){ toast('누가 누워 있어요'); return; }
+  target=null; me.sit=BED.seat; me.x=BED.sx; me.z=BED.sz; me.ry=Math.PI/2; me.pop('💤 벌러덩','#c9b6ff'); sendMove(true); scheduleTrack(); }
+// 냥이 친밀도: 쓰다듬기 +1 (3초 쿨), 츄르 +5 (30초 쿨). 서버에 이름별로 누적
+let petCd=0, churCd=0;
+const catNear = () => me && !me.dead && Math.hypot(me.x-CAT.pos[0], me.z-CAT.pos[1]) < 1.6;
+function catLove(kind){
+  if (!me || me.dead) return; if (!catNear()){ toast('냥이 옆으로 가서 눌러요 🐱'); return; }
+  const now=performance.now(); if (kind==='pet'){ if (now<petCd) return; petCd=now+3000; } else { if (now<churCd){ toast(`츄르는 ${Math.ceil((churCd-now)/1000)}초 뒤에 또 줄 수 있어요`); return; } churCd=now+30000; }
+  me.ry=Math.atan2(CAT.pos[0]-me.x, CAT.pos[1]-me.z); sendMove(true);
+  doActEffect(me, kind, null, true); CAT.react(kind, me); send('act',{type:kind});
+  const n = kind==='churu' ? 5 : 1; record('cat', n); toast(`💕 냥이 친밀도 +${n}`);
+}
 /* ---------------- 기록 & 랭킹판 (Supabase에 저장, 방별) ---------------- */
 let firstShotAt=0, cleanStart=false, blackoutDone=false, board=null;
 function record(kind, value){ if (!SBC || !me) return; try { SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>setTimeout(loadBoard, 600), ()=>{}); } catch {} }
@@ -1147,9 +1189,10 @@ const BOARD_SECTIONS = [
   ['blackoutCnt','🌀 필름 끊김', v=>`${v}회`],
   ['poopCnt','🚽 변기 단골', v=>`${v}회`],
   ['npcKo','🥊 창주 천적', v=>`${v}회 KO`],
+  ['catLove','🐱 냥이 친밀도', v=>`💕 ${v}`],
 ];
 // 1등 칭호 (이름표 위에 표시)
-const TITLE_OF = { blackoutCnt:'🌀 필름 수집가', poopCnt:'🚽 변기 지박령', npcKo:'🥊 창주 천적' };
+const TITLE_OF = { blackoutCnt:'🌀 필름 수집가', poopCnt:'🚽 변기 지박령', npcKo:'🥊 창주 천적', catLove:'🐱 냥이 집사' };
 function titlesFor(name, av){ const t=[]; if (av && av.buff) t.push('💪 버프: 공격 2배'); if (!board) return t.join(' '); for (const k in TITLE_OF){ const r=(board[k]||[])[0]; if (r && String(r.name)===String(name).slice(0,20)) t.push(TITLE_OF[k]); } return t.join(' '); }
 function refreshTitles(){ const all=[]; if (me) all.push(me); others.forEach(o=>all.push(o.av)); all.forEach(av=>{ if ((av.ttl||'')!==titlesFor(av.name, av)) av.updateTag(); }); }
 const boardCv=document.createElement('canvas'); boardCv.width=1280; boardCv.height=800; const boardTex=new THREE.CanvasTexture(boardCv); boardTex.colorSpace=THREE.SRGBColorSpace;
@@ -1230,8 +1273,8 @@ function faint(){
   const f=$('faint'); f.style.pointerEvents='auto'; f.style.opacity='0.92';
 }
 function wake(){
-  faintUntil=0; bac=3.6; me.dead=false; me.setHp(me.hp||100); me.x=BED.wx; me.z=BED.wz; me.ry=Math.PI; camYaw=me.ry+Math.PI; const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
-  doActEffect(me,'wake',null,true); send('act',{type:'wake',x:me.x,z:me.z}); sendMove(true); toast('으… 침대에서 정신 차림. 아직 어질어질해요');
+  faintUntil=0; bac=3.6; me.dead=false; me.setHp(me.hp||100); me.x=BED.sx; me.z=BED.sz; me.ry=Math.PI/2; me.sit=BED.seat; camYaw=-Math.PI/2+0.4; const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
+  doActEffect(me,'wake',null,true); send('act',{type:'wake',x:me.x,z:me.z}); sendMove(true); toast('으… 침대에서 정신 차림. 움직이면 일어나요');
 }
 function updateRegen(dt){ // 5초 동안 안 싸우면 HP 초당 4씩 회복
   const now=performance.now(), rdt=Math.min(1,(now-(updateRegen.last||now))/1000); updateRegen.last=now;
@@ -1285,7 +1328,7 @@ function poop(){ if (!me || me.dead) return; audio();
     const bz=1.24*SCALE, dx=(7.04+7.57)/2*SCALE; if (me.z>bz){ wantPoop=2; goTo(dx, bz+0.45); } else { wantPoop=true; sitAt(TOILET.seat); } return; }
   if (performance.now()<poopCd){ toast('아직 안 나와요… 😣'); return; }
   poopCd=performance.now()+6000; record('poop',1); doActEffect(me,'poop',null,true); send('act',{type:'poop'}); }
-$('aPoop').onclick=poop; $('aThrow').onclick=throwBottle; $('aWb').onclick=wbToggle;
+$('aPoop').onclick=poop; $('aLie').onclick=lieToggle; $('aPet').onclick=()=>catLove('pet'); $('aChur').onclick=()=>catLove('churu'); $('aThrow').onclick=throwBottle; $('aWb').onclick=wbToggle;
 function updatePoopBtn(){ const show = me && !me.dead && (me.sit===TOILET.seat || Math.hypot(me.x-TOILET.x, me.z-TOILET.z) < 1.6);
   const b=$('aPoop'); if (b.style.display !== (show?'':'none')) b.style.display = show?'':'none';
   if (wantPoop===2 && me && !target){ const bz=1.24*SCALE, dx=(7.04+7.57)/2*SCALE; if (Math.hypot(me.x-dx, me.z-bz-0.45)<0.3){ wantPoop=3; goTo(dx, bz-0.4); } else wantPoop=false; return; }
@@ -1452,7 +1495,7 @@ addEventListener('keydown', e=>{
   if (e.key==='Enter'){ e.preventDefault(); $('chatin').focus(); return; }
   if (e.code==='Space'){ e.preventDefault(); jump(); return; }
   const k=keyOf(e); if (MOVE_KEYS.has(k) && !e.repeat){ const now=performance.now(); if (lastMoveKey===k && now-lastMoveT<320) runKey=true; lastMoveKey=k; lastMoveT=now; } input.keys.add(k);
-  if (k==='1' || k==='3') drinkOne(); if (k==='2') act('cheers'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop(); if (k==='c') drinkCondition(); if (k==='b') wbToggle(); if (k==='t') throwBottle();
+  if (k==='1' || k==='3') drinkOne(); if (k==='2') act('cheers'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop(); if (k==='c') drinkCondition(); if (k==='b') wbToggle(); if (k==='t') throwBottle(); if (k==='q') catLove('pet'); if (k==='l') lieToggle(); if (k==='r') catLove('churu');
 });
 addEventListener('keyup', e=>{ input.keys.delete(keyOf(e)); if (![...input.keys].some(k=>MOVE_KEYS.has(k))) runKey=false; });
 addEventListener('blur', ()=>{ input.keys.clear(); runKey=false; });
@@ -1510,6 +1553,9 @@ camera.position.set(HOUSE.table.x, 1.8, 5.2); camera.lookAt(HOUSE.table.x, 0.6, 
 function step(){
   let dt=Math.min(0.05, clock.getDelta()); const t=clock.elapsedTime; if (performance.now()<hitStopUntil) dt*=0.08;
   updatePoopBtn(); { const b=$('aWb'), sh=wbNear(); if (b.style.display!==(sh?'':'none')) b.style.display=sh?'':'none'; }
+  { const onB=me && me.sit===BED.seat, sh=onB || bedNear(); const b=$('aLie'); if (b.style.display!==(sh?'':'none')) b.style.display=sh?'':'none'; const tx=onB?'일어나기':'눕기'; if ($('aLieT').textContent!==tx) $('aLieT').textContent=tx; }
+  { const sh=catNear(); for (const id of ['aPet','aChur']){ const b=$(id); if (b.style.display!==(sh?'':'none')) b.style.display=sh?'':'none'; }
+    const left=Math.ceil((churCd-performance.now())/1000), tx= left>0 ? `츄르 ${left}s` : '츄르 주기'; if ($('aChurT').textContent!==tx) $('aChurT').textContent=tx; }
   if (me){
     // 입력 → 이동 (카메라 기준)
     let ix=input.x, iz=input.z; const K=input.keys;
@@ -1551,7 +1597,7 @@ function step(){
 
   // 카메라
   if (me){
-    const headY = me.sit>=0 ? (seats[me.sit].kind!=='cushion'?1.0:0.85) : 1.35;
+    const headY = me.sit>=0 ? (seats[me.sit].kind==='bed'?0.8:seats[me.sit].kind!=='cushion'?1.0:0.85) : 1.35;
     camTarget.set(me.x, headY, me.z);
     const wob = 0; // 화면 흔들림은 취한 정도(bac)로만 → drunkK()
     const dir=new THREE.Vector3(Math.sin(camYaw)*Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw)*Math.cos(camPitch));
