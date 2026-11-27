@@ -155,7 +155,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 </form>
 <div id="toast" class="hud panel"></div>
 <div id="kfeed"></div>
-<div id="drunk"></div><div id="drunkTag" class="hud panel">🌀 어질어질…</div><div id="faint"><b style="font-size:32px">🍺 필름 끊김…</b><span id="faintMsg" style="margin-top:10px;opacity:.8">zZZ</span></div>
+<div id="drunk"></div><div id="drunkTag" class="hud panel">🌀 어질어질…</div><div id="faint"><b id="faintTitle" style="font-size:32px">🍺 필름 끊김…</b><span id="faintMsg" style="margin-top:10px;opacity:.8">zZZ</span></div>
 <div id="ko" class="hud panel"><b>💀 KO!</b><br><span id="koMsg"></span><br><span id="koCount"></span></div>
 
 <div id="gate">
@@ -175,6 +175,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
+  ['1.31','11/27 16:38','💩 냥이가 가끔 바닥에 똥 쌈 · 밟으면 꽈당 → 침대에서 깨어남'],
   ['1.30','11/27 16:22','❔ 도움말 창이 버튼에 안 가리게 화면 가운데로'],
   ['1.29','11/27 16:15','📱 폰 시점 개선: 좌우 감도 2배 · 움직이면 카메라가 등 뒤로 자동 회전 (? 메뉴에서 끄기)'],
   ['1.28','11/27 16:02','🛏️ 침대에 누우면 침대 전체가 보이는 카메라 · 인형 사람 크기'],
@@ -219,7 +220,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127y';
+window.APP_VER='v20261127z';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -894,6 +895,7 @@ function connect(){
   });
   channel.on('broadcast', { event:'chat' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); const text=String(p.text||'').slice(0,120); if (!text) return; const name=o?o.av.name:'누군가'; addChat(name, text, o?o.av.color:'#ccc'); if (o) o.av.say(text); });
   channel.on('broadcast', { event:'act' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o) return; if (p.type==='respawn'||p.type==='faint'||p.type==='wake'){ o.net=null; o.target=null; } doActEffect(o.av, String(p.type), p, false); });
+  channel.on('broadcast', { event:'cpoop' }, ({payload:p})=>{ if (!p || p.id===myId) return; if (p.gone!=null) catPoopRemove(String(p.gone)); else if (isFinite(p.x)&&isFinite(p.z)) catPoopAdd(String(p.pid).slice(0,24), +p.x, +p.z, true); });
   channel.on('broadcast', { event:'wb' }, ({payload:p})=>{ if (!p || p.id===myId || !Array.isArray(p.p) || p.p.length>4000) return; wbAdd({ c:String(p.c).slice(0,7), w:clamp(num(p.w,6),1,80), p:p.p.map(Number) }, false); });
   channel.on('broadcast', { event:'wbclear' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); wbClearAll(false); sys(`🗑 ${o?o.av.name:'누군가'}님이 화이트보드를 지웠어요`); });
   channel.on('broadcast', { event:'throw' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o) return; o.av.ry=num(p.ry,o.av.ry); o.av.atk=0.4; o.av.atkDur=0.4; o.av.atkType='punch'; launchBottle(o.av, num(p.x,o.av.x), num(p.z,o.av.z), num(p.ry,0), false); });
@@ -921,7 +923,7 @@ function doActEffect(av, type, p, mine){
   else if (type==='ko'){ av.dead=true; av.setHp(0); if (!mine) killFeed(p&&p.by?String(p.by):'', p&&p.w?String(p.w):'', av.name); sys(`💀 ${av.name} KO!${p && p.by ? ' ('+String(p.by).slice(0,12)+' 승)' : ''}`); }
   else if (type==='pet' || type==='churu'){ av.raise=0.8; av.pop(type==='churu'?'🍥 츄르 냠':'🐱 쓰담쓰담','#ffc4d6'); if (!mine) CAT.react(type, av); }
   else if (type==='cond'){ av.pop('🧃 컨디션 꿀꺽!','#ffe27a',true,1.6); if (mine||near) gulp(); }
-  else if (type==='faint'){ av.dead=true; av.sit=-1; if (p && isFinite(p.x) && isFinite(p.z) && av!==me){ av.x=+p.x; av.z=+p.z; av.ry=Math.PI/2; } av.pop('zZZ 💤','#c9b6ff',true,1.2); sys(`🍺 ${av.name} 필름 끊김… (5병 넘음)`); killFeed('', 'faint', av.name); }
+  else if (type==='faint'){ av.dead=true; av.sit=-1; if (p && isFinite(p.x) && isFinite(p.z) && av!==me){ av.x=+p.x; av.z=+p.z; av.ry=Math.PI/2; } av.pop('zZZ 💤','#c9b6ff',true,1.2); if (p && p.slip){ sys(`💩 ${av.name} 냥이 똥 밟고 미끄러짐!`); killFeed('냥이', 'catpoop', av.name); if (near) plop(); } else { sys(`🍺 ${av.name} 필름 끊김… (5병 넘음)`); killFeed('', 'faint', av.name); } }
   else if (type==='wake'){ if (av.hp>0) av.dead=false; if (p && isFinite(p.x) && isFinite(p.z) && av!==me){ av.x=+p.x; av.z=+p.z; } av.pop('…여기 어디야','#ffffff'); }
   else if (type==='respawn'){ av.dead=false; av.setHp(100); av.sit=-1; av.x=HOUSE.spawn.x; av.z=HOUSE.spawn.z; av.ry=HOUSE.spawn.ry; av.pop('부활!','#9fe8ff'); }
   else if (type==='shot'){ av.setFill(0); av.raise=1.0; if (p && p.d!=null) av.setDrinks(p.d); av.pop(['캬~','크으','원샷!','한 잔 더'][Math.floor(Math.random()*4)],'#ffffff'); if (mine||near) gulp(); updateHUD(); }
@@ -1163,7 +1165,7 @@ const CAT = (()=>{
     if (nearMe && performance.now()>meowCd){ meowCd=performance.now()+9000; say(LINES[Math.floor(Math.random()*LINES.length)]); meowSound(); }
     if (bubble){ bubbleT-=dt; if (bubbleT<=0){ g.remove(bubble); bubble.material.map.dispose(); bubble.material.dispose(); bubble=null; } }
   }
-  return { g, update, react, get pos(){ return [g.position.x, g.position.z]; }, get leader(){ const l=leader(); return l?l.name:''; } };
+  return { g, update, react, say, get pos(){ return [g.position.x, g.position.z]; }, get leader(){ const l=leader(); return l?l.name:''; } };
 })();
 // 침대 눕기: 침대 근처에서 버튼 → 인형 옆에 눕기. 움직이거나 다시 누르면 일어남
 const bedNear = () => me && !me.dead && me.sit<0 && me.x>BED.x0-1.2 && me.x<BED.x1+1.2 && me.z>BED.z0-1.2 && me.z<BED.z1+1.2;
@@ -1180,6 +1182,22 @@ function catLove(kind){
   doActEffect(me, kind, null, true); CAT.react(kind, me); send('act',{type:kind});
   const n = kind==='churu' ? 5 : 1; record('cat', n); toast(`💕 냥이 친밀도 +${n}`);
 }
+// 냥이 똥: 접속자 중 id가 제일 작은 사람 화면이 대표로 1~2분마다 냥이 자리에 똥을 놓고 모두에게 알림. 밟으면 미끄러져 필름 끊김과 같은 흐름
+const catPoops=new Map(); let catPoopNext=performance.now()+60000+Math.random()*30000;
+function catPoopAdd(pid, x, z, remote){ if (catPoops.has(pid) || catPoops.size>=4) return;
+  const g=new THREE.Group(); [[0.06,0],[0.045,0.04],[0.03,0.07]].forEach(([r,y])=>{ const m=new THREE.Mesh(new THREE.SphereGeometry(r,12,8), poopMat); m.scale.y=0.65; m.position.y=y+0.03; g.add(m); });
+  const fly=textSprite(['💩'], { bg:'rgba(0,0,0,0)', color:'#fff', font:'40px sans-serif', lh:44, scale:0.004 }); fly.position.y=0.32; g.add(fly);
+  g.position.set(x,0,z); scene.add(g); catPoops.set(pid,{ g, x, z, until:performance.now()+120000, fly });
+  if (me && Math.hypot(me.x-x, me.z-z)<5){ CAT.say && CAT.say('끙… 😼'); } sys('💩 냥이가 바닥에 똥 쌌어요! 밟지 마세요'); }
+function catPoopRemove(pid){ const c=catPoops.get(pid); if (!c) return; scene.remove(c.g); c.fly.material.map.dispose(); c.fly.material.dispose(); catPoops.delete(pid); }
+function updateCatPoops(t){
+  const now=performance.now();
+  for (const [pid,c] of catPoops){ if (now>c.until){ catPoopRemove(pid); continue; } c.fly.position.y=0.32+Math.sin(t*3+c.x)*0.03;
+    if (me && !me.dead && me.sit<0 && !(me.jump>0) && Math.hypot(me.x-c.x, me.z-c.z)<0.3){ catPoopRemove(pid); send('cpoop',{gone:pid}); slipOnPoop(); } }
+  if (now>catPoopNext){ catPoopNext=now+60000+Math.random()*60000;
+    const ids=[myId, ...others.keys()].sort(); if (me && ids[0]===myId){ const [x,z]=CAT.pos; const pid=myId.slice(0,8)+Date.now().toString(36); catPoopAdd(pid,x,z,false); send('cpoop',{pid,x:+x.toFixed(2),z:+z.toFixed(2)}); } }
+}
+function slipOnPoop(){ plop(); me.pop('으앗! 💩','#c98b4a',true,1.6); shake=Math.max(shake,0.6); faint(true); }
 /* ---------------- 기록 & 랭킹판 (Supabase에 저장, 방별) ---------------- */
 let firstShotAt=0, cleanStart=false, blackoutDone=false, board=null;
 function record(kind, value){ if (!SBC || !me) return; try { SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>setTimeout(loadBoard, 600), ()=>{}); } catch {} }
@@ -1270,15 +1288,18 @@ function wbToggle(){ if (wbOpen) return wbShow(false); if (!wbNear()){ toast('�
 /* ---------------- 술 취함: 3병부터 어질어질, 5병이면 기절 ---------------- */
 let bac = 0, faintUntil = 0; // bac = 몸에 남은 술(병). 4분에 1병씩 깸
 const drunkK = () => clamp((bac-3)/2, 0, 1);
-function faint(){
-  if (!me || me.dead) return; if (me.sit>=0) standUp(); target=null; me.dead=true; faintUntil=performance.now()+10000;
+function faint(slip){
+  if (!me || me.dead) return; faintSlip=!!slip; if (me.sit>=0) standUp(); target=null; me.dead=true; faintUntil=performance.now()+10000;
   me.x=BED.sx; me.z=BED.sz; me.ry=Math.PI/2;
-  doActEffect(me,'faint',null,true); send('act',{type:'faint',x:me.x,z:me.z}); sendMove(true); record('blackout',1);
+  doActEffect(me,'faint',{slip:faintSlip},true); send('act',{type:'faint',x:me.x,z:me.z,slip:faintSlip?1:0}); sendMove(true);
+  $('faintTitle').textContent = faintSlip ? '💩 냥이 똥 밟고 꽈당…' : '🍺 필름 끊김…'; if (faintSlip){ const f=$('faint'); f.style.pointerEvents='auto'; f.style.opacity='0.92'; return; }
+  record('blackout',1);
   if (firstShotAt && cleanStart && !blackoutDone){ blackoutDone=true; record('blackout_sec', Math.max(1,(performance.now()-firstShotAt)/1000)); }
   const f=$('faint'); f.style.pointerEvents='auto'; f.style.opacity='0.92';
 }
+let faintSlip=false;
 function wake(){
-  faintUntil=0; bac=3.6; me.dead=false; me.setHp(me.hp||100); me.x=BED.sx; me.z=BED.sz; me.ry=Math.PI/2; me.sit=BED.seat; camYaw=-Math.PI/2+0.4; const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
+  faintUntil=0; if (!faintSlip) bac=3.6; faintSlip=false; me.dead=false; me.setHp(me.hp||100); me.x=BED.sx; me.z=BED.sz; me.ry=Math.PI/2; me.sit=BED.seat; camYaw=-Math.PI/2+0.4; const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
   doActEffect(me,'wake',null,true); send('act',{type:'wake',x:me.x,z:me.z}); sendMove(true); toast('으… 침대에서 정신 차림. 움직이면 일어나요');
 }
 function updateRegen(dt){ // 5초 동안 안 싸우면 HP 초당 4씩 회복
@@ -1436,7 +1457,7 @@ function applyHit(victim, type, attacker){
     if (victim===NPC.av) NPC.hit(attacker, type); else if (victim.hp<=0) victim.dead=true;
   }
 }
-const KF_ICON={ punch:'👊', kick:'🦶', bottle:'🍾', faint:'🍶💫', gomu:'🥊💨' };
+const KF_ICON={ punch:'👊', kick:'🦶', bottle:'🍾', faint:'🍶💫', gomu:'🥊💨', catpoop:'💩🐾' };
 function killFeed(by, w, victim){ const box=$('kfeed'); if (!box) return; const d=document.createElement('div');
   const mine = me && (by===me.name || victim===me.name); if (mine) d.className='me';
   const a=document.createElement('span'); a.className='a'; a.textContent=String(by||'').slice(0,14); const ic=document.createElement('span'); ic.className='w'; ic.textContent=KF_ICON[w]||'💥'; const v=document.createElement('span'); v.className='v'; v.textContent=String(victim||'').slice(0,14);
@@ -1598,7 +1619,7 @@ function step(){
     if (Math.abs(av.kvx)+Math.abs(av.kvz)>0.02){ [av.x,av.z]=collide(av.x+av.kvx*dt, av.z+av.kvz*dt); }
     av.tick(dt,t);
   }
-  updateDrunk(dt, t); NPC.update(dt, t); CAT.update(dt, t); updateFlying(dt); updateThrowBtn(); updateDoors(dt); updateBlood(dt);
+  updateDrunk(dt, t); NPC.update(dt, t); CAT.update(dt, t); updateCatPoops(t); updateFlying(dt); updateThrowBtn(); updateDoors(dt); updateBlood(dt);
   for (let i=floaters.length-1;i>=0;i--){ const f=floaters[i]; f.t+=dt; f.s.position.y=(f.y0||1.5)+f.t*(f.big?1.1:0.6); if (f.big){ const sc=f.t<0.12 ? 0.6+f.t/0.12*0.6 : 1.2-Math.min(0.2,(f.t-0.12)); if (!f.base) f.base=f.s.scale.clone(); f.s.scale.set(f.base.x*sc, f.base.y*sc, 1); } f.s.material.opacity=1-f.t/1.4; if (f.t>1.4){ f.parent.remove(f.s); f.s.material.map.dispose(); f.s.material.dispose(); floaters.splice(i,1); } }
   if (markerT>0){ markerT-=dt; marker.material.opacity=markerT; if (markerT<=0) marker.visible=false; }
 
@@ -1622,7 +1643,7 @@ function step(){
 }
 requestAnimationFrame(step);
 setInterval(updateHUD, 3000);
-window.__dm = { get me(){return me;}, others, seats, act, NPC, CAT, setCam:(y)=>{ camYaw=y; }, get camYaw(){ return camYaw; }, setBac:v=>{bac=v;}, get bac(){return bac;} };
+window.__dm = { get me(){return me;}, others, seats, act, NPC, CAT, setCam:(y)=>{ camYaw=y; }, dropPoop:()=>{ catPoopNext=0; }, get catPoops(){ return catPoops; }, get camYaw(){ return camYaw; }, setBac:v=>{bac=v;}, get bac(){return bac;} };
 </script>
 </body>
 </html>
