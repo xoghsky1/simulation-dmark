@@ -59,6 +59,10 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 #help.show{display:block}
 #rank{top:calc(60px + env(safe-area-inset-top));right:10px;padding:10px 12px;font-size:13px;line-height:1.6;max-width:280px;max-height:70vh;overflow:auto;display:none;pointer-events:auto;z-index:8}
 #rank.show{display:block}
+#kfeed{position:fixed;top:calc(62px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));z-index:6;display:flex;flex-direction:column;align-items:flex-end;gap:4px;pointer-events:none;max-width:70vw}
+#kfeed div{background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:4px 9px;font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70vw;transition:opacity .5s,transform .3s;animation:kin .25s ease-out}
+#kfeed div.me{border-color:#ffd54a;background:rgba(60,45,0,.8)}#kfeed .w{display:inline-block;margin:0 6px;font-size:15px}#kfeed .v{color:#ff8a80}#kfeed .a{color:#9fe8ff}
+@keyframes kin{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
 #wb{position:fixed;inset:0;z-index:20;background:rgba(10,8,6,.88);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 8px calc(8px + env(safe-area-inset-bottom));touch-action:none}
 #wb.show{display:flex}
 #wbc{background:#fff;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.5);touch-action:none;cursor:crosshair}
@@ -139,6 +143,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
   <button type="submit">전송</button>
 </form>
 <div id="toast" class="hud panel"></div>
+<div id="kfeed"></div>
 <div id="drunk"></div><div id="drunkTag" class="hud panel">🌀 어질어질…</div><div id="faint"><b style="font-size:32px">🍺 필름 끊김…</b><span id="faintMsg" style="margin-top:10px;opacity:.8">zZZ</span></div>
 <div id="ko" class="hud panel"><b>💀 KO!</b><br><span id="koMsg"></span><br><span id="koCount"></span></div>
 
@@ -165,7 +170,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127o';
+window.APP_VER='v20261127p';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -858,9 +863,9 @@ function doActEffect(av, type, p, mine){
   else if (type==='cheers'){ av.raise=1.2; av.pop('짠! 🥂'); if (mine||near) clink(mine?0.4:0.25); }
   else if (type==='jump'){ av.jump=0.6; }
   else if (type==='poop'){ poopFx(av, mine||near); }
-  else if (type==='ko'){ av.dead=true; av.setHp(0); sys(`💀 ${av.name} KO!${p && p.by ? ' ('+String(p.by).slice(0,12)+' 승)' : ''}`); }
+  else if (type==='ko'){ av.dead=true; av.setHp(0); if (!mine) killFeed(p&&p.by?String(p.by):'', p&&p.w?String(p.w):'', av.name); sys(`💀 ${av.name} KO!${p && p.by ? ' ('+String(p.by).slice(0,12)+' 승)' : ''}`); }
   else if (type==='cond'){ av.pop('🧃 컨디션 꿀꺽!','#ffe27a',true,1.6); if (mine||near) gulp(); }
-  else if (type==='faint'){ av.dead=true; av.sit=-1; av.pop('zZZ 💤','#c9b6ff',true,1.2); sys(`🍺 ${av.name} 필름 끊김… (5병 넘음)`); }
+  else if (type==='faint'){ av.dead=true; av.sit=-1; av.pop('zZZ 💤','#c9b6ff',true,1.2); sys(`🍺 ${av.name} 필름 끊김… (5병 넘음)`); killFeed('', 'faint', av.name); }
   else if (type==='wake'){ if (av.hp>0) av.dead=false; av.pop('…여기 어디야','#ffffff'); }
   else if (type==='respawn'){ av.dead=false; av.setHp(100); av.sit=-1; av.x=HOUSE.spawn.x; av.z=HOUSE.spawn.z; av.ry=HOUSE.spawn.ry; av.pop('부활!','#9fe8ff'); }
   else if (type==='shot'){ av.setFill(0); av.raise=1.0; if (p && p.d!=null) av.setDrinks(p.d); av.pop(['캬~','크으','원샷!','한 잔 더'][Math.floor(Math.random()*4)],'#ffffff'); if (mine||near) gulp(); updateHUD(); }
@@ -946,9 +951,9 @@ const NPC = (()=>{
     if (rage && !angry || rage && angry && performance.now()>rageNext){ rageNext=performance.now()+2000; const tg=nearestPlayer(); if (tg) angry={ id:tg.id, until:performance.now()+5000 }; } }
   function nearestPlayer(){ let best=null, bd=14; const all=[]; if (me) all.push(me); others.forEach(o=>all.push(o.av)); for (const p of all){ if (p.dead || p.fz) continue; const d=Math.hypot(p.x-cx, p.z-cz); if (d<bd){ bd=d; best=p; } } return best; }
   function showAtk(type){ const A=ATTACKS[type]; av.atk=A.dur; av.atkDur=A.dur; av.atkType=type; if (near(av)) swoosh(); }
-  function hit(attacker){
+  function hit(attacker, w){
     const nowP=performance.now();
-    if (av.hp<=0){ const wasRage=rage; if (rage){ rageDone=rageSlot; setRage(false); } av.dead=true; koUntil=nowP+5000; calm();
+    if (av.hp<=0){ const wasRage=rage; killFeed(attacker&&attacker.name||'', w, av.name); if (rage){ rageDone=rageSlot; setRage(false); } av.dead=true; koUntil=nowP+5000; calm();
       if (wasRage){ sys(`🏆 한마바키 창주 격파!${attacker&&attacker.name?' ('+attacker.name+')':''}`); if (attacker && attacker!==me && attacker.setBuff) attacker.setBuff(Date.now()+60000); if (attacker===me) rageLoot(); } av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`);
       if (attacker===me){ record('npc_ko',1); if (koStart) record('npc_ko_sec', Math.max(1, (nowP-koStart)/1000)); }
       koStart=0; return; }
@@ -1302,15 +1307,21 @@ function applyHit(victim, type, attacker){
   if (attacker===me || victim===me){ shake = Math.max(shake, victim===me ? (type==='kick'?0.5:0.3) : (type==='kick'?0.25:0.15)); hitStopUntil = performance.now() + (type==='kick'?110:70); }
   if (victim===me){
     target=null; if (navigator.vibrate) try{ navigator.vibrate(type==='kick'?120:60); }catch{}
-    if (me.hp<=0) die(attacker); else setTimeout(()=>sendMove(true), 320); scheduleTrack();
+    if (me.hp<=0) die(attacker, type); else setTimeout(()=>sendMove(true), 320); scheduleTrack();
   } else {
     const o=others.get(victim.id); if (o){ o.net=null; o.target=null; }
-    if (victim===NPC.av) NPC.hit(attacker); else if (victim.hp<=0) victim.dead=true;
+    if (victim===NPC.av) NPC.hit(attacker, type); else if (victim.hp<=0) victim.dead=true;
   }
 }
-function die(attacker){
+const KF_ICON={ punch:'👊', kick:'🦶', bottle:'🍾', faint:'🍶💫' };
+function killFeed(by, w, victim){ const box=$('kfeed'); if (!box) return; const d=document.createElement('div');
+  const mine = me && (by===me.name || victim===me.name); if (mine) d.className='me';
+  const a=document.createElement('span'); a.className='a'; a.textContent=String(by||'').slice(0,14); const ic=document.createElement('span'); ic.className='w'; ic.textContent=KF_ICON[w]||'💥'; const v=document.createElement('span'); v.className='v'; v.textContent=String(victim||'').slice(0,14);
+  if (by) d.append(a); d.append(ic, v); box.prepend(d); while (box.children.length>5) box.lastChild.remove();
+  setTimeout(()=>{ d.style.opacity='0'; setTimeout(()=>d.remove(), 600); }, 6000); }
+function die(attacker, w){
   me.dead=true; me.setHp(0); me.sit=-1; target=null;
-  send('act', { type:'ko', by: attacker ? attacker.name : '' }); sendMove(true);
+  send('act', { type:'ko', by: attacker ? attacker.name : '', w: w||'' }); sendMove(true); killFeed(attacker?attacker.name:'', w, me.name);
   sys(`💀 ${attacker ? attacker.name+'에게 ' : ''}KO 당했어요`);
   $('koMsg').textContent = attacker ? `${attacker.name}한테 맞고 뻗었어요` : '뻗었어요'; $('ko').style.display='block';
   let n=5; $('koCount').textContent=`${n}초 뒤 현관에서 부활`;
