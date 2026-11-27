@@ -170,7 +170,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
-  ['1.26','11/27 15:55','🛏️ 필름 끊기면 침대에서 눕고 일어남 · 인형 침대 옆으로'],
+  ['1.26','11/27 16:00','🛏️ 필름 끊기면 침대에서 일어남 · 옆에 인형이 누워 있음'],
   ['1.25','11/27 15:45','🥊 한마바키 창주 고무고무 피스톨 (원거리 주먹)'],
   ['1.24','11/27 15:34','🏃 달리기 (방향키 두 번 연타 · 조이스틱 끝까지)'],
   ['1.23','11/27 15:32','☠️ 우측 상단 킬 피드'],
@@ -210,7 +210,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127t';
+window.APP_VER='v20261127u';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -491,7 +491,7 @@ const faceTo = (x,z) => Math.atan2(TB.x-x, TB.z-z);
       o.position.copy(A).add(B).multiplyScalar(0.5); o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), B.clone().sub(A).normalize()); d.add(o); return o; };
     const lathe=(pts,m,y=0)=>{ const mm=m.clone(); mm.side=THREE.DoubleSide; const o=new THREE.Mesh(new THREE.LatheGeometry(pts.map(([r,h])=>new THREE.Vector2(r,h)),32), mm); o.position.y=y; d.add(o); return o; };
     const tor=lathe([[0.0,0.1],[0.062,0.1],[0.054,0.15],[0.06,0.2],[0.07,0.245],[0.068,0.272],[0.045,0.29],[0.0,0.295]], blouse); tor.scale.z=0.72;
-    const skt=lathe([[0.056,0.135],[0.07,0.11],[0.1,0.05],[0.125,0.0],[0.0,0.0]], skirt); skt.scale.z=0.95; skt.position.z=0.03;
+    const skt=lathe([[0.056,0.135],[0.07,0.11],[0.1,0.05],[0.125,0.0],[0.0,0.0]], skirt); skt.scale.z=0.5; skt.position.z=0.01; // 누워서 납작해진 치마
     const col=add(new THREE.CylinderGeometry(0.06,0.082,0.012,28,1,false,Math.PI*0.25,Math.PI*1.5), skirt, 0,0.282,-0.004); col.scale.z=0.75; // 세일러 칼라 (뒤·어깨)
     for (const s of [-1,1]){ const r=add(new THREE.SphereGeometry(0.014,10,8), ribbon, s*0.015,0.245,0.052); r.scale.set(1.4,0.9,0.5); r.rotation.z=s*0.5;
       const tl=add(new THREE.BoxGeometry(0.01,0.045,0.004), ribbon, s*0.008,0.22,0.05); tl.rotation.z=s*0.2; }
@@ -501,13 +501,13 @@ const faceTo = (x,z) => Math.atan2(TB.x-x, TB.z-z);
       add(new THREE.SphereGeometry(0.024,12,10), blouse, s*0.075,0.268,0);
       limb([s*0.08,0.262,0], [s*0.095,0.165,0.02], 0.02, blouse);
       add(new THREE.SphereGeometry(0.022,10,8), blouse, s*0.093,0.14,0.024).scale.set(1,0.6,1); // 소매 끝
-      limb([s*0.092,0.15,0.03], [s*0.06,0.09,0.12], 0.014, skin);
-      const hand=add(new THREE.SphereGeometry(0.017,10,8), skin, s*0.055,0.085,0.135); hand.scale.set(0.8,0.6,1.2);
+      limb([s*0.092,0.15,0.03], [s*0.1,0.065,0.03], 0.014, skin); // 누운 자세: 팔은 옆구리
+      const hand=add(new THREE.SphereGeometry(0.017,10,8), skin, s*0.1,0.05,0.035); hand.scale.set(0.8,0.6,1.2);
       // 다리: 허벅지 → 무릎 → 발 (니삭스 + 로퍼)
-      limb([s*0.04,0.045,0.03], [s*0.045,0.06,0.2], 0.03, skin);
-      limb([s*0.045,0.06,0.2], [s*0.048,0.035,0.36], 0.024, sock);
-      add(new THREE.SphereGeometry(0.031,12,10), sock, s*0.045,0.06,0.2);
-      const sh=add(new THREE.SphereGeometry(0.026,12,10), shoe, s*0.048,0.035,0.39); sh.scale.set(0.9,0.75,1.5); }
+      limb([s*0.04,0.04,0.02], [s*0.042,-0.12,0.015], 0.03, skin); // 누운 자세: 다리 쭉 폄
+      limb([s*0.042,-0.12,0.015], [s*0.044,-0.28,0.0], 0.024, sock);
+      add(new THREE.SphereGeometry(0.031,12,10), sock, s*0.042,-0.12,0.015);
+      const sh=add(new THREE.SphereGeometry(0.026,12,10), shoe, s*0.044,-0.305,0.02); sh.scale.set(0.9,0.75,1.5); }
     // 머리
     const head=new THREE.Group(); head.position.set(0,0.36,0.008); head.scale.setScalar(0.58); d.add(head);
     const HR=0.1; const hd=add(new THREE.SphereGeometry(HR,32,24), skin, 0,0,0, head); hd.scale.set(1.05,0.96,0.98);
@@ -630,7 +630,7 @@ const TOILET = { x: 8.28*SCALE - T/2 - 0.5, z: 1.24*SCALE - T/2 - 0.42, seat: -1
 ANC={x:0,z:5.57};
 box(2.0,0.35,1.55,'#d8d8d4',1.1,0.175,4.68,true); box(1.96,0.16,1.5,'#fbfaf7',1.12,0.43,4.68); box(0.4,0.1,1.4,'#ffffff',0.3,0.55,4.68); box(1.1,0.1,1.54,'#ece9e2',1.5,0.52,4.68); box(0.5,0.18,0.6,'#e4e0d6',0.9,0.6,4.3);
 const BED={ x0:AX(0.1), x1:AX(2.1), z0:AZ(3.9), z1:AZ(5.46), sx:AX(1.25), sz:AZ(4.75), wx:AX(1.2), wz:AZ(3.9)-0.45 }; // 필름 끊기면 여기서 눕고 일어남
-if (window.__plush){ const d=window.__plush; d.position.set(AX(0.62), 0.03, AZ(3.9)-0.2); d.rotation.y=Math.PI+0.25; } // 인형: 침대 옆 바닥에 기대앉음
+if (window.__plush){ const d=window.__plush; d.position.set(BED.sx-0.4, 0.58, BED.sz+0.4); d.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,0,-1), new THREE.Vector3(-1,0,0), new THREE.Vector3(0,1,0))); d.rotateY(-0.35); } // 인형: 필름 끊긴 사람 옆에 나란히 누워 있음
 const onBed=(x,z)=>x>BED.x0&&x<BED.x1&&z>BED.z0&&z<BED.z1;
 // 옷방 (거실 아래쪽 방): 흰 행거 두 줄 + 옷
 ANC={x:5.53,z:8.11};
