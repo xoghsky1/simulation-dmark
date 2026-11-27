@@ -170,6 +170,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
+  ['1.26','11/27 15:55','🛏️ 필름 끊기면 침대에서 눕고 일어남 · 인형 침대 옆으로'],
   ['1.25','11/27 15:45','🥊 한마바키 창주 고무고무 피스톨 (원거리 주먹)'],
   ['1.24','11/27 15:34','🏃 달리기 (방향키 두 번 연타 · 조이스틱 끝까지)'],
   ['1.23','11/27 15:32','☠️ 우측 상단 킬 피드'],
@@ -209,7 +210,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127s';
+window.APP_VER='v20261127t';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -628,6 +629,9 @@ const TOILET = { x: 8.28*SCALE - T/2 - 0.5, z: 1.24*SCALE - T/2 - 0.42, seat: -1
 // 침실1: 침대, 협탁
 ANC={x:0,z:5.57};
 box(2.0,0.35,1.55,'#d8d8d4',1.1,0.175,4.68,true); box(1.96,0.16,1.5,'#fbfaf7',1.12,0.43,4.68); box(0.4,0.1,1.4,'#ffffff',0.3,0.55,4.68); box(1.1,0.1,1.54,'#ece9e2',1.5,0.52,4.68); box(0.5,0.18,0.6,'#e4e0d6',0.9,0.6,4.3);
+const BED={ x0:AX(0.1), x1:AX(2.1), z0:AZ(3.9), z1:AZ(5.46), sx:AX(1.25), sz:AZ(4.75), wx:AX(1.2), wz:AZ(3.9)-0.45 }; // 필름 끊기면 여기서 눕고 일어남
+if (window.__plush){ const d=window.__plush; d.position.set(AX(0.62), 0.03, AZ(3.9)-0.2); d.rotation.y=Math.PI+0.25; } // 인형: 침대 옆 바닥에 기대앉음
+const onBed=(x,z)=>x>BED.x0&&x<BED.x1&&z>BED.z0&&z<BED.z1;
 // 옷방 (거실 아래쪽 방): 흰 행거 두 줄 + 옷
 ANC={x:5.53,z:8.11};
 { const CL=['#2b2b2b','#6b5a4a','#e8e2d6','#1f2a38','#3a3a3a','#bfa68a','#f2f2f2','#2f2f2f','#5a4a3a','#1b1b1b','#d8cfc0','#444'];
@@ -742,9 +746,9 @@ class Avatar {
   remove(){ scene.remove(this.g); }
   tick(dt, t){
     const seat = this.sit>=0 ? seats[this.sit] : null;
-    const targetY = this.dead ? 0.12 : seat ? (seat.kind==='sofa' ? 0.42-0.5 : seat.kind==='toilet' ? 0.46-0.5 : 0.07-0.48) : 0;
+    const targetY = this.dead ? (onBed(this.x,this.z)?0.57:0.12) : seat ? (seat.kind==='sofa' ? 0.42-0.5 : seat.kind==='toilet' ? 0.46-0.5 : 0.07-0.48) : 0;
     this.body.position.y += (targetY - this.body.position.y) * Math.min(1, dt*10);
-    this.lean = (this.lean||0) + (((this.moving&&this.run)?0.28:0) - (this.lean||0))*Math.min(1,dt*8); this.body.rotation.x = this.lean;
+    this.lean = (this.lean||0) + (((this.moving&&this.run)?0.28:0) - (this.lean||0))*Math.min(1,dt*8);
     if (this.moving){ const r=this.run; this.walk += dt*(r?16:9); this.body.position.y += Math.abs(Math.sin(this.walk))*(r?0.07:0.035); this.body.rotation.z = Math.sin(this.walk)*(r?0.07:0.04);
       if (r && !this.atk && this.raise<=0) this.arm.rotation.x = Math.sin(this.walk)*0.9; } else if (this.arm.rotation.x && !this.atk && this.raise<=0 && this.run===false) this.arm.rotation.x*=0.8;
     else { const dr = this===me ? (drunkK()>0 ? bac*EMPTY_BOTTLES_PER : 0) : this.drinks; this.body.rotation.z = Math.sin(t*1.3+this.x)*Math.min(dr,18)*0.006; }
@@ -768,7 +772,7 @@ class Avatar {
     if (kik>0) this.body.position.y += kik*0.12;
     this.hitT = Math.max(0, this.hitT - dt); const kd=Math.exp(-9*dt); this.kvx*=kd; this.kvz*=kd;
     if (!this.dead && this.hp<40){ this.dripT-=dt; if (this.dripT<=0){ this.dripT=0.5+Math.random()*0.8; spawnBlood(this.x, 1.0, this.z, 0, 0, 1); } }
-    let rx = -kik*0.35 - this.hitT*1.3; if (this.dead) rx = -1.45;
+    let rx = -kik*0.35 - this.hitT*1.3 + this.lean; if (this.dead) rx = -1.45;
     this.body.rotation.x += (rx - this.body.rotation.x) * Math.min(1, dt*(this.dead?6:14));
     this.flash = Math.max(0, this.flash - dt); this.cm.emissive.setRGB(this.flash*2.2, 0, 0);
     if (this.bubble){ this.bubbleT -= dt; if (this.bubbleT<=0){ this.g.remove(this.bubble); this.bubble.material.map.dispose(); this.bubble.material.dispose(); this.bubble=null; } else if (this.bubbleT<0.6) this.bubble.material.opacity=this.bubbleT/0.6; }
@@ -879,7 +883,7 @@ function connect(){
       o.av.run = Math.hypot(num(p.vx),num(p.vz))>2.6; o.av.sit = Number.isInteger(p.sit)&&seats[p.sit] ? p.sit : -1; if (o.av.sit>=0){ o.av.x=seats[o.av.sit].x; o.av.z=seats[o.av.sit].z; o.av.ry=seats[o.av.sit].ry; o.net=null; } }
   });
   channel.on('broadcast', { event:'chat' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); const text=String(p.text||'').slice(0,120); if (!text) return; const name=o?o.av.name:'누군가'; addChat(name, text, o?o.av.color:'#ccc'); if (o) o.av.say(text); });
-  channel.on('broadcast', { event:'act' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o) return; if (p.type==='respawn'){ o.net=null; o.target=null; } doActEffect(o.av, String(p.type), p, false); });
+  channel.on('broadcast', { event:'act' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o) return; if (p.type==='respawn'||p.type==='faint'||p.type==='wake'){ o.net=null; o.target=null; } doActEffect(o.av, String(p.type), p, false); });
   channel.on('broadcast', { event:'wb' }, ({payload:p})=>{ if (!p || p.id===myId || !Array.isArray(p.p) || p.p.length>4000) return; wbAdd({ c:String(p.c).slice(0,7), w:clamp(num(p.w,6),1,80), p:p.p.map(Number) }, false); });
   channel.on('broadcast', { event:'wbclear' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); wbClearAll(false); sys(`🗑 ${o?o.av.name:'누군가'}님이 화이트보드를 지웠어요`); });
   channel.on('broadcast', { event:'throw' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o) return; o.av.ry=num(p.ry,o.av.ry); o.av.atk=0.4; o.av.atkDur=0.4; o.av.atkType='punch'; launchBottle(o.av, num(p.x,o.av.x), num(p.z,o.av.z), num(p.ry,0), false); });
@@ -906,8 +910,8 @@ function doActEffect(av, type, p, mine){
   else if (type==='poop'){ poopFx(av, mine||near); }
   else if (type==='ko'){ av.dead=true; av.setHp(0); if (!mine) killFeed(p&&p.by?String(p.by):'', p&&p.w?String(p.w):'', av.name); sys(`💀 ${av.name} KO!${p && p.by ? ' ('+String(p.by).slice(0,12)+' 승)' : ''}`); }
   else if (type==='cond'){ av.pop('🧃 컨디션 꿀꺽!','#ffe27a',true,1.6); if (mine||near) gulp(); }
-  else if (type==='faint'){ av.dead=true; av.sit=-1; av.pop('zZZ 💤','#c9b6ff',true,1.2); sys(`🍺 ${av.name} 필름 끊김… (5병 넘음)`); killFeed('', 'faint', av.name); }
-  else if (type==='wake'){ if (av.hp>0) av.dead=false; av.pop('…여기 어디야','#ffffff'); }
+  else if (type==='faint'){ av.dead=true; av.sit=-1; if (p && isFinite(p.x) && isFinite(p.z) && av!==me){ av.x=+p.x; av.z=+p.z; av.ry=Math.PI/2; } av.pop('zZZ 💤','#c9b6ff',true,1.2); sys(`🍺 ${av.name} 필름 끊김… (5병 넘음)`); killFeed('', 'faint', av.name); }
+  else if (type==='wake'){ if (av.hp>0) av.dead=false; if (p && isFinite(p.x) && isFinite(p.z) && av!==me){ av.x=+p.x; av.z=+p.z; } av.pop('…여기 어디야','#ffffff'); }
   else if (type==='respawn'){ av.dead=false; av.setHp(100); av.sit=-1; av.x=HOUSE.spawn.x; av.z=HOUSE.spawn.z; av.ry=HOUSE.spawn.ry; av.pop('부활!','#9fe8ff'); }
   else if (type==='shot'){ av.setFill(0); av.raise=1.0; if (p && p.d!=null) av.setDrinks(p.d); av.pop(['캬~','크으','원샷!','한 잔 더'][Math.floor(Math.random()*4)],'#ffffff'); if (mine||near) gulp(); updateHUD(); }
 }
@@ -1220,13 +1224,14 @@ let bac = 0, faintUntil = 0; // bac = 몸에 남은 술(병). 4분에 1병씩 �
 const drunkK = () => clamp((bac-3)/2, 0, 1);
 function faint(){
   if (!me || me.dead) return; if (me.sit>=0) standUp(); target=null; me.dead=true; faintUntil=performance.now()+10000;
-  doActEffect(me,'faint',null,true); send('act',{type:'faint'}); sendMove(true); record('blackout',1);
+  me.x=BED.sx; me.z=BED.sz; me.ry=Math.PI/2;
+  doActEffect(me,'faint',null,true); send('act',{type:'faint',x:me.x,z:me.z}); sendMove(true); record('blackout',1);
   if (firstShotAt && cleanStart && !blackoutDone){ blackoutDone=true; record('blackout_sec', Math.max(1,(performance.now()-firstShotAt)/1000)); }
   const f=$('faint'); f.style.pointerEvents='auto'; f.style.opacity='0.92';
 }
 function wake(){
-  faintUntil=0; bac=3.6; me.dead=false; me.setHp(me.hp||100); const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
-  doActEffect(me,'wake',null,true); send('act',{type:'wake'}); sendMove(true); toast('으… 정신 차림. 아직 어질어질해요');
+  faintUntil=0; bac=3.6; me.dead=false; me.setHp(me.hp||100); me.x=BED.wx; me.z=BED.wz; me.ry=Math.PI; camYaw=me.ry+Math.PI; const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
+  doActEffect(me,'wake',null,true); send('act',{type:'wake',x:me.x,z:me.z}); sendMove(true); toast('으… 침대에서 정신 차림. 아직 어질어질해요');
 }
 function updateRegen(dt){ // 5초 동안 안 싸우면 HP 초당 4씩 회복
   const now=performance.now(), rdt=Math.min(1,(now-(updateRegen.last||now))/1000); updateRegen.last=now;
