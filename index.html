@@ -55,6 +55,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 #toast{left:50%;top:30%;transform:translateX(-50%);padding:10px 16px;font-size:15px;opacity:0;transition:opacity .3s;white-space:nowrap}
 #toast.show{opacity:1}
 #net{left:50%;top:calc(56px + env(safe-area-inset-top));transform:translateX(-50%);padding:6px 12px;font-size:12px;display:none;color:var(--accent2)}
+#topbtns button{white-space:nowrap}
 #help{left:50%;top:50%;transform:translate(-50%,-50%);z-index:9;pointer-events:auto;background:rgba(24,20,16,.97);padding:12px 14px;font-size:13px;line-height:1.65;color:var(--muted);width:min(92vw,380px);max-height:82vh;overflow:auto;display:none;box-shadow:0 10px 40px rgba(0,0,0,.6)}
 #helpClose{float:right;pointer-events:auto}
 #help.show{display:block}
@@ -175,6 +176,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
+  ['1.32','11/27 16:50','🛠 원샷 꾹 누르기 막음 · 🏆 한마바키 격파 랭킹 · 버프/이름표/침대 겹침/시작 카메라 수정'],
   ['1.31','11/27 16:38','💩 냥이가 가끔 바닥에 똥 쌈 · 밟으면 꽈당 → 침대에서 깨어남'],
   ['1.30','11/27 16:22','❔ 도움말 창이 버튼에 안 가리게 화면 가운데로'],
   ['1.29','11/27 16:15','📱 폰 시점 개선: 좌우 감도 2배 · 움직이면 카메라가 등 뒤로 자동 회전 (? 메뉴에서 끄기)'],
@@ -220,7 +222,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127z';
+window.APP_VER='v20261127za';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -278,7 +280,7 @@ const HOUSE = {
     [3.37,8.11, 5.1,8.11, 0.8,2.1], // 옷방 창
   ],
   table: { x: 5.35, z: 3.95, w: 1.5, d: 0.85, h: 0.36 },  // 거실 좌식 술상
-  spawn: { x: 9.0, z: 2.85, ry: -Math.PI/2 },               // 현관에서 시작
+  spawn: { x: 8.45, z: 2.85, ry: -Math.PI/2 },               // 현관에서 시작
 };
 // 집 전체 확대 배율 (1 = 평면도 실측). 가구 크기는 그대로, 방만 넓어짐
 const SCALE = 1.7;
@@ -937,7 +939,7 @@ function act(type){
   scheduleTrack();
 }
 let drinkBusy=false;
-function drinkOne(){ if (!me || me.dead || drinkBusy) return; if (me.fill<0.1) me.setFill(1); act('shot'); drinkBusy=true; setTimeout(()=>{ drinkBusy=false; }, 120); } // 연타하는 대로 바로 원샷
+function drinkOne(){ if (!me || me.dead || drinkBusy) return; if (me.fill<0.1) me.setFill(1); act('shot'); drinkBusy=true; setTimeout(()=>{ drinkBusy=false; }, 200); } // 연타하는 대로 바로 원샷
 $('aCheers').onclick=()=>act('cheers'); $('aShot').onclick=drinkOne;
 /* ---------------- NPC 창주: 집 안을 돌아다님 ----------------
    위치는 시계(Date.now)로만 정해져서 서버 없이도 모든 사람 화면에서 같은 자리에 보임 */
@@ -1011,14 +1013,14 @@ const NPC = (()=>{
   function showAtk(type){ const A=ATTACKS[type]; av.atk=A.dur; av.atkDur=A.dur; av.atkType=type; if (near(av)) swoosh(); }
   function hit(attacker, w){
     const nowP=performance.now();
-    if (av.hp<=0){ const wasRage=rage; killFeed(attacker&&attacker.name||'', w, av.name); if (rage){ rageDone=rageSlot; setRage(false); } av.dead=true; koUntil=nowP+5000; calm();
-      if (wasRage){ sys(`🏆 한마바키 창주 격파!${attacker&&attacker.name?' ('+attacker.name+')':''}`); if (attacker && attacker!==me && attacker.setBuff) attacker.setBuff(Date.now()+60000); if (attacker===me) rageLoot(); } av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`);
+    if (av.hp<=0){ if (!koStart) koStart=nowP-500; const wasRage=rage; killFeed(attacker&&attacker.name||'', w, av.name); if (rage){ rageDone=rageSlot; setRage(false); } av.dead=true; koUntil=nowP+5000; calm();
+      if (wasRage){ sys(`🏆 한마바키 창주 격파!${attacker&&attacker.name?' ('+attacker.name+')':''}`); if (attacker===me) rageLoot(); } av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`);
       if (attacker===me){ record('npc_ko',1); if (koStart) record('npc_ko_sec', Math.max(1, (nowP-koStart)/1000)); }
       koStart=0; return; }
     if (!koStart) koStart=nowP;
     lastHurt=nowP;
     if (attacker && attacker!==av){ const was=angry && angry.id===attacker.id;
-      angry={ id: attacker.id, until: nowP+15000 }; av.setName('😡 창주');
+      angry={ id: attacker.id, until: nowP+15000 }; av.setName(rage?'💪 한마바키 창주':'😡 창주');
       if (!was){ av.say(RAGE[Math.floor(Math.random()*RAGE.length)]); av.pop('💢','#ff3b30',true,1.9); }
       av.ry=Math.atan2(attacker.x-av.x, attacker.z-av.z); } }
   function angryTarget(){ if (!angry) return null; if (angry.id===myId) return me; const o=others.get(angry.id); return o ? o.av : null; }
@@ -1200,7 +1202,12 @@ function updateCatPoops(t){
 function slipOnPoop(){ plop(); me.pop('으앗! 💩','#c98b4a',true,1.6); shake=Math.max(shake,0.6); faint(true); }
 /* ---------------- 기록 & 랭킹판 (Supabase에 저장, 방별) ---------------- */
 let firstShotAt=0, cleanStart=false, blackoutDone=false, board=null;
-function record(kind, value){ if (!SBC || !me) return; try { SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>setTimeout(loadBoard, 600), ()=>{}); } catch {} }
+let drinkRecT=null, drinkRecV=0, boardT=null;
+function loadBoardSoon(){ if (boardT) return; boardT=setTimeout(()=>{ boardT=null; loadBoard(); }, 2500); }
+function record(kind, value){ if (!SBC || !me) return;
+  if (kind==='drinks'){ drinkRecV=value; if (drinkRecT) return; drinkRecT=setTimeout(()=>{ drinkRecT=null; recordNow('drinks', drinkRecV); }, 1500); return; } // 연타해도 1.5초에 한 번만 저장
+  recordNow(kind, value); }
+function recordNow(kind, value){ try { SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>loadBoardSoon(), ()=>{}); } catch {} }
 function visit(){ if (!SBC || !me) return; try { SBC.rpc('dmark_visit', { p_room:ROOM, p_sid:myId, p_name:me.name.slice(0,20) }).then(()=>{}, ()=>{}); } catch {} }
 async function loadBoard(){ if (!SBC) return; try { const { data, error } = await SBC.rpc('dmark_board', { p_room:ROOM }); if (!error && data){ board=data; drawBoard(); refreshTitles(); } } catch (e) { console.warn(e); } }
 const fmtSec = v => { v=Math.round(v); return v>=60 ? `${Math.floor(v/60)}분 ${v%60}초` : `${v}초`; };
@@ -1213,9 +1220,10 @@ const BOARD_SECTIONS = [
   ['poopCnt','🚽 변기 단골', v=>`${v}회`],
   ['npcKo','🥊 창주 천적', v=>`${v}회 KO`],
   ['catLove','🐱 냥이 친밀도', v=>`💕 ${v}`],
+  ['rageKo','💪 한마바키 격파', v=>`${v}회`],
 ];
 // 1등 칭호 (이름표 위에 표시)
-const TITLE_OF = { blackoutCnt:'🌀 필름 수집가', poopCnt:'🚽 변기 지박령', npcKo:'🥊 창주 천적', catLove:'🐱 냥이 집사' };
+const TITLE_OF = { blackoutCnt:'🌀 필름 수집가', poopCnt:'🚽 변기 지박령', npcKo:'🥊 창주 천적', catLove:'🐱 냥이 집사', rageKo:'💪 한마 사냥꾼' };
 function titlesFor(name, av){ const t=[]; if (av && av.buff) t.push('💪 버프: 공격 2배'); if (!board) return t.join(' '); for (const k in TITLE_OF){ const r=(board[k]||[])[0]; if (r && String(r.name)===String(name).slice(0,20)) t.push(TITLE_OF[k]); } return t.join(' '); }
 function refreshTitles(){ const all=[]; if (me) all.push(me); others.forEach(o=>all.push(o.av)); all.forEach(av=>{ if ((av.ttl||'')!==titlesFor(av.name, av)) av.updateTag(); }); }
 const boardCv=document.createElement('canvas'); boardCv.width=1280; boardCv.height=800; const boardTex=new THREE.CanvasTexture(boardCv); boardTex.colorSpace=THREE.SRGBColorSpace;
@@ -1225,12 +1233,12 @@ function drawBoard(){
   const g=boardCv.getContext('2d'), W=boardCv.width, H=boardCv.height; const F='"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif';
   const bg=g.createLinearGradient(0,0,0,H); bg.addColorStop(0,'#1d2a22'); bg.addColorStop(1,'#0f1612'); g.fillStyle=bg; g.fillRect(0,0,W,H);
   g.fillStyle='#ffcf5a'; g.font=`900 54px ${F}`; g.textAlign='center'; g.fillText('🏆 창주집 명예의 전당', W/2, 70);
-  const cells=[[24,110,300],[332,110,300],[640,110,300],[948,110,300],[24,450,300],[332,450,300],[640,450,300],[948,450,300]];
+  const cells=[]; for (let r=0;r<2;r++) for (let c=0;c<5;c++) cells.push([16+c*250, 110+r*340, 242]);
   BOARD_SECTIONS.forEach(([key,title,fmt],i)=>{ const [x,y,w]=cells[i]; g.fillStyle='rgba(255,255,255,.06)'; g.fillRect(x,y,w,320);
-    g.textAlign='left'; g.fillStyle='#fff'; g.font=`bold 30px ${F}`; g.fillText(title, x+14, y+44); if (TITLE_OF[key]){ g.fillStyle='#ffd54a'; g.font=`22px ${F}`; g.textAlign='right'; g.fillText('1등 칭호: '+TITLE_OF[key].split(' ')[1], x+w-12, y+44); g.textAlign='left'; }
-    const rows=(board && board[key]) || []; g.font=`26px ${F}`;
+    g.textAlign='left'; g.fillStyle='#fff'; g.font=`bold 26px ${F}`; g.fillText(title, x+12, y+40); if (TITLE_OF[key]){ g.fillStyle='#ffd54a'; g.font=`19px ${F}`; g.fillText('1등 칭호: '+TITLE_OF[key].split(' ')[1], x+12, y+68); }
+    const rows=(board && board[key]) || []; g.font=`22px ${F}`;
     if (!rows.length){ g.fillStyle='rgba(255,255,255,.45)'; g.fillText('아직 기록 없음', x+18, y+100); }
-    rows.slice(0,5).forEach((r,j)=>{ const yy=y+100+j*46; g.fillStyle=['#ffd54a','#d9d9d9','#e0a26b','#bbb','#bbb'][j]; g.fillText(`${j+1}. ${String(r.name).slice(0,7)}`, x+14, yy); g.textAlign='right'; g.fillStyle='#fff'; g.fillText(fmt(+r.v), x+w-12, yy); g.textAlign='left'; });
+    rows.slice(0,5).forEach((r,j)=>{ const yy=y+112+j*44; g.fillStyle=['#ffd54a','#d9d9d9','#e0a26b','#bbb','#bbb'][j]; g.fillText(`${j+1}. ${String(r.name).slice(0,6)}`, x+12, yy); g.textAlign='right'; g.fillStyle='#fff'; g.fillText(fmt(+r.v), x+w-12, yy); g.textAlign='left'; });
   });
   boardTex.needsUpdate=true;
   const el=$('rankBody'); if (el){ el.innerHTML=''; BOARD_SECTIONS.forEach(([key,title,fmt])=>{ const h=document.createElement('b'); h.textContent=title+(TITLE_OF[key]?` (1등 칭호 ${TITLE_OF[key]})`:''); el.appendChild(h); const rows=(board&&board[key])||[]; const ol=document.createElement('div'); ol.className='rk';
@@ -1290,7 +1298,7 @@ let bac = 0, faintUntil = 0; // bac = 몸에 남은 술(병). 4분에 1병씩 �
 const drunkK = () => clamp((bac-3)/2, 0, 1);
 function faint(slip){
   if (!me || me.dead) return; faintSlip=!!slip; if (me.sit>=0) standUp(); target=null; me.dead=true; faintUntil=performance.now()+10000;
-  me.x=BED.sx; me.z=BED.sz; me.ry=Math.PI/2;
+  const bedFree=!seatTakenBy(BED.seat); me.x=bedFree?BED.sx:BED.wx; me.z=bedFree?BED.sz:BED.wz; me.ry=Math.PI/2;
   doActEffect(me,'faint',{slip:faintSlip},true); send('act',{type:'faint',x:me.x,z:me.z,slip:faintSlip?1:0}); sendMove(true);
   $('faintTitle').textContent = faintSlip ? '💩 냥이 똥 밟고 꽈당…' : '🍺 필름 끊김…'; if (faintSlip){ const f=$('faint'); f.style.pointerEvents='auto'; f.style.opacity='0.92'; return; }
   record('blackout',1);
@@ -1299,7 +1307,7 @@ function faint(slip){
 }
 let faintSlip=false;
 function wake(){
-  faintUntil=0; if (!faintSlip) bac=3.6; faintSlip=false; me.dead=false; me.setHp(me.hp||100); me.x=BED.sx; me.z=BED.sz; me.ry=Math.PI/2; me.sit=BED.seat; camYaw=-Math.PI/2+0.4; const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
+  faintUntil=0; if (!faintSlip) bac=3.6; faintSlip=false; me.dead=false; me.setHp(me.hp||100); if (!seatTakenBy(BED.seat)){ me.x=BED.sx; me.z=BED.sz; me.ry=Math.PI/2; me.sit=BED.seat; } else { me.x=BED.wx; me.z=BED.wz; me.ry=Math.PI; } camYaw=-Math.PI/2+0.4; const f=$('faint'); f.style.opacity='0'; f.style.pointerEvents='none';
   doActEffect(me,'wake',null,true); send('act',{type:'wake',x:me.x,z:me.z}); sendMove(true); toast('으… 침대에서 정신 차림. 움직이면 일어나요');
 }
 function updateRegen(dt){ // 5초 동안 안 싸우면 HP 초당 4씩 회복
@@ -1312,7 +1320,7 @@ function updateRegen(dt){ // 5초 동안 안 싸우면 HP 초당 4씩 회복
 function updateDrunk(dt, t){
   updateRegen(dt);
   if (!me) return;
-  if (faintUntil){ const left=Math.ceil((faintUntil-performance.now())/1000); $('faintMsg').textContent = left>0 ? `zZZ… ${left}초 뒤 정신 차림` : ''; if (left<=0) wake(); return; }
+  if (faintUntil){ $('drunkTag').style.display='none'; const left=Math.ceil((faintUntil-performance.now())/1000); $('faintMsg').textContent = left>0 ? `zZZ… ${left}초 뒤 정신 차림` : ''; if (left<=0) wake(); return; }
   bac = Math.max(0, bac - dt/240);
   if (bac>=5 && !me.dead){ faint(); return; }
   const k=drunkK(); const c=$('c');
@@ -1521,7 +1529,7 @@ addEventListener('keydown', e=>{
   if (e.key==='Enter'){ e.preventDefault(); $('chatin').focus(); return; }
   if (e.code==='Space'){ e.preventDefault(); jump(); return; }
   const k=keyOf(e); if (MOVE_KEYS.has(k) && !e.repeat){ const now=performance.now(); if (lastMoveKey===k && now-lastMoveT<320) runKey=true; lastMoveKey=k; lastMoveT=now; } input.keys.add(k);
-  if (k==='1' || k==='3') drinkOne(); if (k==='2') act('cheers'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop(); if (k==='c') drinkCondition(); if (k==='b') wbToggle(); if (k==='t') throwBottle(); if (k==='q') catLove('pet'); if (k==='l') lieToggle(); if (k==='r') catLove('churu');
+  if ((k==='1' || k==='3') && !e.repeat) drinkOne(); if (k==='2') act('cheers'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop(); if (k==='c') drinkCondition(); if (k==='b') wbToggle(); if (k==='t') throwBottle(); if (k==='q') catLove('pet'); if (k==='l') lieToggle(); if (k==='r') catLove('churu');
 });
 addEventListener('keyup', e=>{ input.keys.delete(keyOf(e)); if (![...input.keys].some(k=>MOVE_KEYS.has(k))) runKey=false; });
 addEventListener('blur', ()=>{ input.keys.clear(); runKey=false; });
