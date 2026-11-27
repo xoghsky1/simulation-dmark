@@ -92,6 +92,11 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 #gate button.go{width:100%;background:var(--accent);border:0;font-size:17px;font-weight:700;padding:13px;color:#fff}
 #gate .bottle{font-size:44px}
 #gate small{display:block;margin-top:12px;color:var(--muted);font-size:12px}
+#changes{margin-top:14px;padding-top:10px;border-top:1px solid var(--line);text-align:left}
+#changes .ch-h{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}#changes .ch-h b{color:#ffcf5a;margin-left:4px}
+#chList{max-height:132px;overflow-y:auto;font-size:12px;line-height:1.55;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#chList div{display:flex;gap:6px;color:var(--text)}#chList i{font-style:normal;color:#ffcf5a;min-width:34px}#chList i,#chList u{white-space:nowrap;flex-shrink:0}#chList u{text-decoration:none;color:var(--muted);min-width:70px;font-variant-numeric:tabular-nums}
+#chList div:first-child{font-weight:700}
 </style>
 </head>
 <body>
@@ -157,9 +162,41 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
     <div class="colors" id="colors"></div>
     <button class="go" id="enter">입장하기</button>
     <small id="gateNote">최대 20명 · 설치 없이 폰/PC 브라우저</small>
+    <div id="changes"><div class="ch-h">📋 업데이트 <b id="chVer"></b></div><div id="chList"></div></div>
+    <script>document.addEventListener("DOMContentLoaded",function(){ var L=window.CHANGELOG||[]; var v=document.getElementById("chVer"), b=document.getElementById("chList"); if (!L.length) return; v.textContent="v"+L[0][0]; L.forEach(function(r){ var d=document.createElement("div"); var i=document.createElement("i"); i.textContent="v"+r[0]; var u=document.createElement("u"); u.textContent=r[1]; var t=document.createElement("span"); t.textContent=r[2]; d.append(i,u,t); b.appendChild(d); }); });</script>
   </div>
 </div>
 
+<script>
+// 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
+window.CHANGELOG = [
+  ['1.24','11/27 15:34','🏃 달리기 (방향키 두 번 연타 · 조이스틱 끝까지)'],
+  ['1.23','11/27 15:32','☠️ 우측 상단 킬 피드'],
+  ['1.22','11/27 15:31','🧸 소파 인형'],
+  ['1.21','11/27 15:16','🐱 테라스 고양이'],
+  ['1.20','11/27 14:42','버튼 배치 정리'],
+  ['1.19','11/27 14:40','🍾 병날리기 (T) · 원샷 버튼 통합 · 폰 확대 방지'],
+  ['1.18','11/27 14:28','💪 한마바키 창주 (5분마다) · 격파 시 1분 버프'],
+  ['1.17','11/27 14:15','✍️ 방명록 화이트보드 (B)'],
+  ['1.16','11/27 14:11','🏅 1등 칭호 (필름 수집가 · 변기 지박령 · 창주 천적)'],
+  ['1.15','11/26 19:32','새 버전 나오면 자동 새로고침'],
+  ['1.14','11/26 17:08','👥 오늘 다녀간 사람'],
+  ['1.13','11/26 17:00','💚 HP 자동 회복'],
+  ['1.12','11/26 16:48','🏆 명예의 전당 · 맞으면 화내는 창주'],
+  ['1.11','11/26 16:32','🧃 컨디션 (숙취 해소)'],
+  ['1.10','11/26 16:28','⌨️ 액션 단축키'],
+  ['1.9','11/26 16:26','🍶 3병 어질어질 · 5병 기절'],
+  ['1.8','11/26 15:15','👊 창주 때리기'],
+  ['1.7','11/26 13:56','🚶 NPC 창주 등장'],
+  ['1.6','11/26 13:11','🚽 럭셔리 변기 · 💩 똥싸기'],
+  ['1.5','11/26 11:51','💥 타격감 강화 · TV 사진'],
+  ['1.4','11/26 11:40','🏠 집 확장 · 옷방 · 테라스 술상'],
+  ['1.3','11/26 11:16','👊 펀치 · 🦶 발차기 · 점프'],
+  ['1.2','11/26 10:55','🗣️ 줴줴이야'],
+  ['1.1','11/26 10:46','평면도 기준 집 구조'],
+  ['1.0','11/26 10:31','🍶 디마크 술자리 오픈'],
+];
+</script>
 <script>
 // 아이폰: 두 번 탭 / 핀치로 화면 확대되는 것 막기
 (function(){ var pd=function(e){ e.preventDefault(); };
@@ -171,7 +208,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127q';
+window.APP_VER='v20261127r';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
