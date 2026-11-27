@@ -55,7 +55,8 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 #toast{left:50%;top:30%;transform:translateX(-50%);padding:10px 16px;font-size:15px;opacity:0;transition:opacity .3s;white-space:nowrap}
 #toast.show{opacity:1}
 #net{left:50%;top:calc(56px + env(safe-area-inset-top));transform:translateX(-50%);padding:6px 12px;font-size:12px;display:none;color:var(--accent2)}
-#help{top:calc(60px + env(safe-area-inset-top));right:10px;padding:10px 12px;font-size:12px;line-height:1.6;color:var(--muted);max-width:250px;display:none}
+#help{left:50%;top:50%;transform:translate(-50%,-50%);z-index:9;pointer-events:auto;background:rgba(24,20,16,.97);padding:12px 14px;font-size:13px;line-height:1.65;color:var(--muted);width:min(92vw,380px);max-height:82vh;overflow:auto;display:none;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+#helpClose{float:right;pointer-events:auto}
 #help.show{display:block}
 #rank{top:calc(60px + env(safe-area-inset-top));right:10px;padding:10px 12px;font-size:13px;line-height:1.6;max-width:280px;max-height:70vh;overflow:auto;display:none;pointer-events:auto;z-index:8}
 #rank.show{display:block}
@@ -122,12 +123,12 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 </div><canvas id="wbc"></canvas><div id="wbInfo">✍️ 방명록: 쓴 건 자동 저장돼서 모두에게 보여요</div></div>
 <div id="rank" class="hud panel"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">🏆 명예의 전당</b><button id="rankClose">✕</button></div><div id="rankBody"></div></div>
 <div id="help" class="hud panel">
-  <b style="color:var(--text)">조작법</b><br>
+  <button id="helpClose">✕</button><b style="color:var(--text)">조작법</b><br>
   PC: WASD/방향키 이동 · 마우스 드래그 시점 · 휠 줌 · Enter 채팅<br>
   폰: 왼쪽 조이스틱 이동 · 화면 드래그 시점 · 두 손가락 줌<br>
   <button id="autoCamBtn" style="margin:4px 0;pointer-events:auto">🎥 자동 시점: 켜짐</button><br>
   바닥을 톡 누르면 거기로 걸어가요. 방석이나 소파를 누르면 가서 앉아요.<br>
-  단축키: 1 따르기 · 2 짠 · 3 원샷 · 4 줴줴이야 · Space 점프 · F 펀치 · G 발차기 · E 앉기 · P 똥싸기(변기 근처) · C 컨디션(숙취 해소)<br>HP가 0이 되면 5초 뒤 현관에서 부활 · 5초간 안 싸우면 HP 자동 회복
+  단축키: 1 원샷 · 2 짠 · 4 줴줴이야 · Space 점프 · F 펀치 · G 발차기 · T 병날리기 · E 앉기 · L 침대 눕기 · Q 냥이 쓰다듬기 · R 츄르 · P 똥싸기(변기 근처) · B 방명록 · C 컨디션(숙취 해소) · 방향키 두 번 연타 달리기<br>HP가 0이 되면 5초 뒤 현관에서 부활 · 5초간 안 싸우면 HP 자동 회복
 </div>
 <div id="net" class="hud panel">서버에 다시 연결하는 중…</div>
 <div id="chatlog" class="hud"></div>
@@ -174,6 +175,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
+  ['1.30','11/27 16:22','❔ 도움말 창이 버튼에 안 가리게 화면 가운데로'],
   ['1.29','11/27 16:15','📱 폰 시점 개선: 좌우 감도 2배 · 움직이면 카메라가 등 뒤로 자동 회전 (? 메뉴에서 끄기)'],
   ['1.28','11/27 16:02','🛏️ 침대에 누우면 침대 전체가 보이는 카메라 · 인형 사람 크기'],
   ['1.27','11/27 15:58','🐱 냥이 집 안 로밍 · 쓰다듬기/츄르 친밀도 · 1등 따라다님 · 🛏️ 침대 눕기 · 원샷 연타'],
@@ -217,7 +219,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127x';
+window.APP_VER='v20261127y';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -1482,7 +1484,7 @@ function updateHUD(){
   $('aSit').innerHTML = me && me.sit>=0 ? '<span>🧍</span>일어나기' : '<span>🪑</span>앉기';
 }
 $('info').onclick=()=>$('info').classList.toggle('open');
-$('helpbtn').onclick=()=>$('help').classList.toggle('show');
+$('helpbtn').onclick=()=>$('help').classList.toggle('show'); $('helpClose').onclick=()=>$('help').classList.remove('show');
 $('rankbtn').onclick=()=>{ $('rank').classList.toggle('show'); loadBoard(); }; $('rankClose').onclick=()=>$('rank').classList.remove('show');
 $('invite').onclick=async ()=>{ const url = location.href.split('#')[0];
   if (navigator.share && isTouch){ try { await navigator.share({ title:'디마크 술자리', text:'디마크 거실에서 한잔 ㄱㄱ 🍶', url }); return; } catch {} }
