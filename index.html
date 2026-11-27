@@ -176,6 +176,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
+  ['1.33','11/27 16:54','🗣️ 줴줴이야 횟수 명예의 전당 + 1등 칭호 "줴줴 장인"'],
   ['1.32','11/27 16:50','🛠 원샷 꾹 누르기 막음 · 🏆 한마바키 격파 랭킹 · 버프/이름표/침대 겹침/시작 카메라 수정'],
   ['1.31','11/27 16:38','💩 냥이가 가끔 바닥에 똥 쌈 · 밟으면 꽈당 → 침대에서 깨어남'],
   ['1.30','11/27 16:22','❔ 도움말 창이 버튼에 안 가리게 화면 가운데로'],
@@ -222,7 +223,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127za';
+window.APP_VER='v20261127zb';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -1212,7 +1213,7 @@ function visit(){ if (!SBC || !me) return; try { SBC.rpc('dmark_visit', { p_room
 async function loadBoard(){ if (!SBC) return; try { const { data, error } = await SBC.rpc('dmark_board', { p_room:ROOM }); if (!error && data){ board=data; drawBoard(); refreshTitles(); } } catch (e) { console.warn(e); } }
 const fmtSec = v => { v=Math.round(v); return v>=60 ? `${Math.floor(v/60)}분 ${v%60}초` : `${v}초`; };
 const BOARD_SECTIONS = [
-  ['allDrinks','🍶 역대 주량', v=>`${v}잔 (${(v/EMPTY_BOTTLES_PER).toFixed(1)}병)`],
+  ['allDrinks','🍶 역대 주량', v=>`${v}잔`],
   ['todayDrinks','🐳 오늘의 술고래', v=>`${v}잔`],
   ['fastBlackout','💫 최단 필름 끊김', fmtSec],
   ['fastKo','⚡ 최단 창주 KO', fmtSec],
@@ -1221,9 +1222,10 @@ const BOARD_SECTIONS = [
   ['npcKo','🥊 창주 천적', v=>`${v}회 KO`],
   ['catLove','🐱 냥이 친밀도', v=>`💕 ${v}`],
   ['rageKo','💪 한마바키 격파', v=>`${v}회`],
+  ['jjeCnt','🗣️ 줴줴이야', v=>`${v}회`],
 ];
 // 1등 칭호 (이름표 위에 표시)
-const TITLE_OF = { blackoutCnt:'🌀 필름 수집가', poopCnt:'🚽 변기 지박령', npcKo:'🥊 창주 천적', catLove:'🐱 냥이 집사', rageKo:'💪 한마 사냥꾼' };
+const TITLE_OF = { blackoutCnt:'🌀 필름 수집가', poopCnt:'🚽 변기 지박령', npcKo:'🥊 창주 천적', catLove:'🐱 냥이 집사', rageKo:'💪 한마 사냥꾼', jjeCnt:'🗣️ 줴줴 장인' };
 function titlesFor(name, av){ const t=[]; if (av && av.buff) t.push('💪 버프: 공격 2배'); if (!board) return t.join(' '); for (const k in TITLE_OF){ const r=(board[k]||[])[0]; if (r && String(r.name)===String(name).slice(0,20)) t.push(TITLE_OF[k]); } return t.join(' '); }
 function refreshTitles(){ const all=[]; if (me) all.push(me); others.forEach(o=>all.push(o.av)); all.forEach(av=>{ if ((av.ttl||'')!==titlesFor(av.name, av)) av.updateTag(); }); }
 const boardCv=document.createElement('canvas'); boardCv.width=1280; boardCv.height=800; const boardTex=new THREE.CanvasTexture(boardCv); boardTex.colorSpace=THREE.SRGBColorSpace;
@@ -1233,12 +1235,12 @@ function drawBoard(){
   const g=boardCv.getContext('2d'), W=boardCv.width, H=boardCv.height; const F='"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif';
   const bg=g.createLinearGradient(0,0,0,H); bg.addColorStop(0,'#1d2a22'); bg.addColorStop(1,'#0f1612'); g.fillStyle=bg; g.fillRect(0,0,W,H);
   g.fillStyle='#ffcf5a'; g.font=`900 54px ${F}`; g.textAlign='center'; g.fillText('🏆 창주집 명예의 전당', W/2, 70);
-  const cells=[]; for (let r=0;r<2;r++) for (let c=0;c<5;c++) cells.push([16+c*250, 110+r*340, 242]);
+  const cells=[]; for (let r=0;r<2;r++) for (let c=0;c<6;c++) cells.push([12+c*211, 110+r*340, 204]);
   BOARD_SECTIONS.forEach(([key,title,fmt],i)=>{ const [x,y,w]=cells[i]; g.fillStyle='rgba(255,255,255,.06)'; g.fillRect(x,y,w,320);
-    g.textAlign='left'; g.fillStyle='#fff'; g.font=`bold 26px ${F}`; g.fillText(title, x+12, y+40); if (TITLE_OF[key]){ g.fillStyle='#ffd54a'; g.font=`19px ${F}`; g.fillText('1등 칭호: '+TITLE_OF[key].split(' ')[1], x+12, y+68); }
-    const rows=(board && board[key]) || []; g.font=`22px ${F}`;
+    g.textAlign='left'; g.fillStyle='#fff'; g.font=`bold 23px ${F}`; g.fillText(title, x+10, y+40); if (TITLE_OF[key]){ g.fillStyle='#ffd54a'; g.font=`17px ${F}`; g.fillText('1등: '+TITLE_OF[key].split(' ').slice(1).join(' '), x+10, y+68); }
+    const rows=(board && board[key]) || []; g.font=`20px ${F}`;
     if (!rows.length){ g.fillStyle='rgba(255,255,255,.45)'; g.fillText('아직 기록 없음', x+18, y+100); }
-    rows.slice(0,5).forEach((r,j)=>{ const yy=y+112+j*44; g.fillStyle=['#ffd54a','#d9d9d9','#e0a26b','#bbb','#bbb'][j]; g.fillText(`${j+1}. ${String(r.name).slice(0,6)}`, x+12, yy); g.textAlign='right'; g.fillStyle='#fff'; g.fillText(fmt(+r.v), x+w-12, yy); g.textAlign='left'; });
+    rows.slice(0,5).forEach((r,j)=>{ const yy=y+112+j*44; g.fillStyle=['#ffd54a','#d9d9d9','#e0a26b','#bbb','#bbb'][j]; g.fillText(`${j+1}. ${String(r.name).slice(0,5)}`, x+10, yy); g.textAlign='right'; g.fillStyle='#fff'; g.fillText(fmt(+r.v), x+w-12, yy); g.textAlign='left'; });
   });
   boardTex.needsUpdate=true;
   const el=$('rankBody'); if (el){ el.innerHTML=''; BOARD_SECTIONS.forEach(([key,title,fmt])=>{ const h=document.createElement('b'); h.textContent=title+(TITLE_OF[key]?` (1등 칭호 ${TITLE_OF[key]})`:''); el.appendChild(h); const rows=(board&&board[key])||[]; const ol=document.createElement('div'); ol.className='rk';
@@ -1494,7 +1496,9 @@ $('aSit').onclick=()=>{ if (!me || me.dead) return; if (me.sit>=0){ standUp(); }
 function addChat(name, text, color){ const d=document.createElement('div'); const b=document.createElement('b'); b.textContent=name; b.style.color=color; d.appendChild(b); d.appendChild(document.createTextNode(text)); pushLog(d); }
 function sys(text){ const d=document.createElement('div'); d.className='sys'; d.textContent=text; pushLog(d); }
 function pushLog(d){ const log=$('chatlog'); log.appendChild(d); while (log.children.length>7) log.firstChild.remove(); setTimeout(()=>{ d.style.opacity='0'; setTimeout(()=>d.remove(),1000); }, 15000); }
-function sayOut(text){ if (!me) return; addChat(me.name, text, me.color); me.say(text); send('chat',{text}); }
+let jjeN=0, jjeT=null, jjeLast=0;
+function sayOut(text){ if (!me) return; addChat(me.name, text, me.color); me.say(text); send('chat',{text});
+  if (text==='줴줴이야'){ const now=performance.now(); if (now-jjeLast<300) return; jjeLast=now; jjeN++; if (!jjeT) jjeT=setTimeout(()=>{ jjeT=null; const n=Math.min(20,jjeN); jjeN=0; if (n>0) record('jje', n); }, 3000); } } // 줴줴이야 횟수: 3초씩 모아서 저장
 document.querySelectorAll('#actions .say').forEach(b=>b.onclick=()=>{ audio(); sayOut(b.dataset.say); });
 $('chatbar').addEventListener('submit', e=>{ e.preventDefault(); const inp=$('chatin'); const text=inp.value.trim().slice(0,120); if (!text||!me) return; inp.value='';
   sayOut(text);
@@ -1529,7 +1533,7 @@ addEventListener('keydown', e=>{
   if (e.key==='Enter'){ e.preventDefault(); $('chatin').focus(); return; }
   if (e.code==='Space'){ e.preventDefault(); jump(); return; }
   const k=keyOf(e); if (MOVE_KEYS.has(k) && !e.repeat){ const now=performance.now(); if (lastMoveKey===k && now-lastMoveT<320) runKey=true; lastMoveKey=k; lastMoveT=now; } input.keys.add(k);
-  if ((k==='1' || k==='3') && !e.repeat) drinkOne(); if (k==='2') act('cheers'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop(); if (k==='c') drinkCondition(); if (k==='b') wbToggle(); if (k==='t') throwBottle(); if (k==='q') catLove('pet'); if (k==='l') lieToggle(); if (k==='r') catLove('churu');
+  if ((k==='1' || k==='3') && !e.repeat) drinkOne(); if (k==='2') act('cheers'); if (k==='e') $('aSit').onclick(); if (k==='4' && !e.repeat) sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop(); if (k==='c') drinkCondition(); if (k==='b') wbToggle(); if (k==='t') throwBottle(); if (k==='q') catLove('pet'); if (k==='l') lieToggle(); if (k==='r') catLove('churu');
 });
 addEventListener('keyup', e=>{ input.keys.delete(keyOf(e)); if (![...input.keys].some(k=>MOVE_KEYS.has(k))) runKey=false; });
 addEventListener('blur', ()=>{ input.keys.clear(); runKey=false; });
@@ -1651,7 +1655,7 @@ function step(){
 }
 requestAnimationFrame(step);
 setInterval(updateHUD, 3000);
-window.__dm = { get me(){return me;}, others, seats, act, NPC, CAT, setCam:(y)=>{ camYaw=y; }, dropPoop:()=>{ catPoopNext=0; }, get catPoops(){ return catPoops; }, get camYaw(){ return camYaw; }, setBac:v=>{bac=v;}, get bac(){return bac;} };
+window.__dm = { get me(){return me;}, others, seats, act, NPC, CAT, setCam:(y)=>{ camYaw=y; }, dropPoop:()=>{ catPoopNext=0; }, boardCv:()=>boardCv, get catPoops(){ return catPoops; }, get camYaw(){ return camYaw; }, setBac:v=>{bac=v;}, get bac(){return bac;} };
 </script>
 </body>
 </html>
