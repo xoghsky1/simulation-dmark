@@ -148,7 +148,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127b';
+window.APP_VER='v20261127c';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -823,11 +823,23 @@ const NPC = (()=>{
   // 분노 모드: 맞으면 때린 사람을 쫓아가서 반격
   let angry=null, chase=null, chaseT=0, npcAtkReady=0, koStart=0, cx=0, cz=0;
   const RAGE=['💢 너 이리 와!!','죽었어 넌','어딜 도망가','창주 화났다 😡'];
-  function calm(line){ if (!angry) return; angry=null; chase=null; av.setName('창주'); if (line) av.say(line); }
+  function calm(line){ if (!angry) return; angry=null; chase=null; av.setName(rage?'🔥 광폭 창주':'창주'); if (line) av.say(line); }
+  // 광폭화: 5분마다(시계 기준이라 모두 같은 시각) 1분간. 크고 빠르고 세짐, 가까운 사람 아무나 공격, 받는 피해 절반
+  const RAGE_EVERY=300000, RAGE_LEN=60000; let rage=false, rageSlot=-1, rageDone=-1, rageNext=0;
+  const ring=new THREE.Mesh(new THREE.RingGeometry(0.45,0.62,40), new THREE.MeshBasicMaterial({ color:'#ff3b30', transparent:true, opacity:0.7, side:THREE.DoubleSide, depthWrite:false })); ring.rotation.x=-Math.PI/2; ring.position.y=0.02; ring.visible=false; av.g.add(ring);
+  function setRage(on){ if (rage===on) return; rage=on; if (!on){ angry=null; chase=null; } av.g.scale.setScalar(on?1.3:1); ring.visible=on; av.setName(on?'🔥 광폭 창주':'창주');
+    if (on){ av.setHp(100); av.say('🔥 다 덤벼!!! 🔥'); av.pop('💢💢💢','#ff3b30',true,2.2); sys('🔥 창주 광폭화! 1분 동안 아무나 공격해요. 쓰러뜨리면 🎁 전리품!'); toast('🔥 창주 광폭화!'); if (navigator.vibrate) try{ navigator.vibrate([80,60,80]); }catch{} }
+    else { angry=null; chase=null; } }
+  function rageTick(){ const now=Date.now(), slot=Math.floor(now/RAGE_EVERY), inWin=(now%RAGE_EVERY)<RAGE_LEN;
+    if (inWin && rageDone!==slot && !av.dead){ rageSlot=slot; setRage(true); }
+    else if (rage && (!inWin || rageDone===slot)){ const quiet=rageDone!==slot; setRage(false); if (quiet){ av.say('하… 진정됐다'); sys('😮‍💨 창주 광폭화 끝. 아무도 못 쓰러뜨렸어요'); } }
+    if (rage && !angry || rage && angry && performance.now()>rageNext){ rageNext=performance.now()+2000; const tg=nearestPlayer(); if (tg) angry={ id:tg.id, until:performance.now()+5000 }; } }
+  function nearestPlayer(){ let best=null, bd=14; const all=[]; if (me) all.push(me); others.forEach(o=>all.push(o.av)); for (const p of all){ if (p.dead || p.fz) continue; const d=Math.hypot(p.x-cx, p.z-cz); if (d<bd){ bd=d; best=p; } } return best; }
   function showAtk(type){ const A=ATTACKS[type]; av.atk=A.dur; av.atkDur=A.dur; av.atkType=type; if (near(av)) swoosh(); }
   function hit(attacker){
     const nowP=performance.now();
-    if (av.hp<=0){ av.dead=true; koUntil=nowP+5000; calm(); av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`);
+    if (av.hp<=0){ const wasRage=rage; if (rage){ rageDone=rageSlot; setRage(false); } av.dead=true; koUntil=nowP+5000; calm();
+      if (wasRage){ sys(`🏆 광폭 창주 격파!${attacker&&attacker.name?' ('+attacker.name+')':''}`); if (attacker===me) rageLoot(); } av.pop('KO! 💀','#ff3b30',true,2.0); sys(`💀 창주 KO!${attacker&&attacker.name?' ('+attacker.name+' 승)':''}`);
       if (attacker===me){ record('npc_ko',1); if (koStart) record('npc_ko_sec', Math.max(1, (nowP-koStart)/1000)); }
       koStart=0; return; }
     if (!koStart) koStart=nowP;
@@ -839,17 +851,18 @@ const NPC = (()=>{
   function angryTarget(){ if (!angry) return null; if (angry.id===myId) return me; const o=others.get(angry.id); return o ? o.av : null; }
   function updateAngry(dt){
     const tg=angryTarget(); const nowP=performance.now();
+    if (rage && (!tg || tg.dead || nowP>angry.until)){ angry=null; chase=null; const n=nearestPlayer(); if (n){ angry={ id:n.id, until:nowP+5000 }; rageNext=nowP+2000; } else { av.moving=false; av.x=cx; av.z=cz; return true; } return true; }
     if (!tg || tg.dead || nowP>angry.until || Math.hypot(tg.x-cx, tg.z-cz)>20){ const line = tg && tg.dead ? '까불고 있어 🤨' : '흥, 봐준다'; calm(line); return false; }
     const d=Math.hypot(tg.x-cx, tg.z-cz);
-    if (d>0.95){
+    if (d>(rage?1.1:0.95)){
       chaseT-=dt; if (chaseT<=0 || !chase){ chaseT=0.6; chase=path([cx,cz],[tg.x,tg.z]); if (chase.length>1) chase.shift(); }
       let wp=chase[0]||[tg.x,tg.z]; if (Math.hypot(wp[0]-cx, wp[1]-cz)<0.15 && chase.length>1){ chase.shift(); wp=chase[0]; }
       if (chase.length<=1) wp=[tg.x,tg.z];
-      const dx=wp[0]-cx, dz=wp[1]-cz, l=Math.hypot(dx,dz)||1, sp=2.5*dt; [cx,cz]=collide(cx+dx/l*Math.min(sp,l), cz+dz/l*Math.min(sp,l));
+      const dx=wp[0]-cx, dz=wp[1]-cz, l=Math.hypot(dx,dz)||1, sp=(rage?3.3:2.5)*dt; [cx,cz]=collide(cx+dx/l*Math.min(sp,l), cz+dz/l*Math.min(sp,l));
       av.ry=Math.atan2(dx,dz); av.moving=true;
     } else {
       av.moving=false; av.ry=Math.atan2(tg.x-cx, tg.z-cz);
-      if (nowP>npcAtkReady){ const type=Math.random()<0.6?'punch':'kick'; npcAtkReady=nowP+1150; showAtk(type);
+      if (nowP>npcAtkReady){ const type=Math.random()<0.6?'punch':'kick'; npcAtkReady=nowP+(rage?800:1150); showAtk(type);
         if (tg===me && !me.dead){ applyHit(me, type, av); send('npcatk',{type}); } }
     }
     cx+=av.kvx*dt; cz+=av.kvz*dt; [cx,cz]=collide(cx,cz);
@@ -858,7 +871,8 @@ const NPC = (()=>{
   function update(dt, t){
     if (!route) build();
     if (av.dead){ if (performance.now()>koUntil){ av.dead=false; av.setHp(100); ox=oz=0; av.pop('부활!','#9fe8ff'); } else { av.moving=false; av.tick(dt,t); return; } }
-    if (av.hp<100 && !angry && performance.now()-lastHurt>3000){ regen+=dt*4; if (regen>=1){ av.setHp(av.hp+1); regen-=1; if (av.hp>=100) koStart=0; } } // 천천히 회복
+    rageTick(); if (rage){ ring.material.opacity=0.45+0.35*Math.sin(t*8); }
+    if (av.hp<100 && !angry && !rage && performance.now()-lastHurt>3000){ regen+=dt*4; if (regen>=1){ av.setHp(av.hp+1); regen-=1; if (av.hp>=100) koStart=0; } } // 천천히 회복
     ox+=av.kvx*dt; oz+=av.kvz*dt; const back=Math.exp(-1.2*dt); ox*=back; oz*=back;
     const now=(Date.now()/1000) % total; if (!route[seg] || now<route[seg].t0 || now>=route[seg].t1){ seg=route.findIndex(r=>now>=r.t0&&now<r.t1); if (seg<0) seg=0; }
     const r=route[seg];
@@ -873,8 +887,10 @@ const NPC = (()=>{
     cx=av.x; cz=av.z;
     av.tick(dt, t);
   }
-  return { av, update, hit, showAtk, get angry(){ return angry; }, get route(){ if (!route) build(); return route; } };
+  return { av, update, hit, showAtk, get angry(){ return angry; }, get rage(){ return rage; }, get route(){ if (!route) build(); return route; } };
 })();
+/* 광폭 창주 전리품 (무엇을 줄지 정해지면 여기서 지급) */
+function rageLoot(){ record('rage_ko',1); toast('🎁 광폭 창주 격파! 전리품은 곧 공개'); }
 /* ---------------- 기록 & 랭킹판 (Supabase에 저장, 방별) ---------------- */
 let firstShotAt=0, cleanStart=false, blackoutDone=false, board=null;
 function record(kind, value){ if (!SBC || !me) return; try { SBC.rpc('dmark_record', { p_room:ROOM, p_kind:kind, p_name:me.name.slice(0,20), p_value:Math.round(value*10)/10 }).then(()=>setTimeout(loadBoard, 600), ()=>{}); } catch {} }
@@ -1064,8 +1080,9 @@ function applyHit(victim, type, attacker){
   if (victim===me || attacker===me) lastCombat=performance.now();
   const A=ATTACKS[type]; if (!A || !victim || victim.dead) return;
   const dx=victim.x-attacker.x, dz=victim.z-attacker.z, d=Math.hypot(dx,dz)||1, ux=dx/d, uz=dz/d;
-  victim.flash=0.45; victim.hitT=0.35; victim.setHp(victim.hp - A.dmg);
-  victim.pop(`${A.label} -${A.dmg}`, '#ff3b30', true, 1.75); victim.pop('💥', '#fff', true, type==='kick'?0.7:1.05);
+  const dmg = Math.round(A.dmg * (victim===NPC.av && NPC.rage ? 0.5 : 1) * (attacker===NPC.av && NPC.rage ? 1.5 : 1));
+  victim.flash=0.45; victim.hitT=0.35; victim.setHp(victim.hp - dmg);
+  victim.pop(`${A.label} -${dmg}`, '#ff3b30', true, 1.75); victim.pop('💥', '#fff', true, type==='kick'?0.7:1.05);
   spawnBlood(victim.x+ux*-0.1, type==='kick'?0.75:1.12, victim.z+uz*-0.1, ux, uz, type==='kick'?22:14);
   if (near(victim)) thump(type==='kick');
   if (victim.sit<0){ victim.kvx = ux*A.kb*9; victim.kvz = uz*A.kb*9; }
