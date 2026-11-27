@@ -125,6 +125,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
   <b style="color:var(--text)">조작법</b><br>
   PC: WASD/방향키 이동 · 마우스 드래그 시점 · 휠 줌 · Enter 채팅<br>
   폰: 왼쪽 조이스틱 이동 · 화면 드래그 시점 · 두 손가락 줌<br>
+  <button id="autoCamBtn" style="margin:4px 0;pointer-events:auto">🎥 자동 시점: 켜짐</button><br>
   바닥을 톡 누르면 거기로 걸어가요. 방석이나 소파를 누르면 가서 앉아요.<br>
   단축키: 1 따르기 · 2 짠 · 3 원샷 · 4 줴줴이야 · Space 점프 · F 펀치 · G 발차기 · E 앉기 · P 똥싸기(변기 근처) · C 컨디션(숙취 해소)<br>HP가 0이 되면 5초 뒤 현관에서 부활 · 5초간 안 싸우면 HP 자동 회복
 </div>
@@ -173,6 +174,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <script>
 // 주요 업데이트 (최신이 위). 배포할 때마다 맨 위에 한 줄 추가 + 버전 올리기
 window.CHANGELOG = [
+  ['1.29','11/27 16:15','📱 폰 시점 개선: 좌우 감도 2배 · 움직이면 카메라가 등 뒤로 자동 회전 (? 메뉴에서 끄기)'],
   ['1.28','11/27 16:02','🛏️ 침대에 누우면 침대 전체가 보이는 카메라 · 인형 사람 크기'],
   ['1.27','11/27 15:58','🐱 냥이 집 안 로밍 · 쓰다듬기/츄르 친밀도 · 1등 따라다님 · 🛏️ 침대 눕기 · 원샷 연타'],
   ['1.26','11/27 15:50','🛏️ 필름 끊기면 침대에서 인형 옆에 누운 채로 깨어남'],
@@ -215,7 +217,7 @@ window.CHANGELOG = [
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127w';
+window.APP_VER='v20261127x';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -825,7 +827,7 @@ const SPEED = 2.0;
 const input = { x:0, z:0, keys:new Set() };
 let target = null; // {x,z,seat}
 let stuckT = 0;
-let camYaw = Math.PI, camPitch = 0.42, camDist = 3.2;
+let lastCamDrag = 0, autoCam = (()=>{ try { const v=localStorage.getItem('dm_autocam'); return v==null ? true : v==='1'; } catch { return true; } })(); let camYaw = Math.PI, camPitch = 0.42, camDist = 3.2;
 
 function seatTakenBy(i){ if (me && me.sit===i) return myId; for (const [id,o] of others) if (o.av.sit===i) return id; return null; }
 function nearestFreeSeat(x,z,cushionOnly=false){ let best=-1, bd=1e9; seats.forEach((s,i)=>{ if (seatTakenBy(i) || s.kind==='bed' || (cushionOnly && s.kind!=='cushion')) return; const d=Math.hypot(s.x-x,s.z-z); if (d<bd){bd=d;best=i;} }); return best; }
@@ -1329,7 +1331,7 @@ function poop(){ if (!me || me.dead) return; audio();
     const bz=1.24*SCALE, dx=(7.04+7.57)/2*SCALE; if (me.z>bz){ wantPoop=2; goTo(dx, bz+0.45); } else { wantPoop=true; sitAt(TOILET.seat); } return; }
   if (performance.now()<poopCd){ toast('아직 안 나와요… 😣'); return; }
   poopCd=performance.now()+6000; record('poop',1); doActEffect(me,'poop',null,true); send('act',{type:'poop'}); }
-$('aPoop').onclick=poop; $('aLie').onclick=lieToggle; $('aPet').onclick=()=>catLove('pet'); $('aChur').onclick=()=>catLove('churu'); $('aThrow').onclick=throwBottle; $('aWb').onclick=wbToggle;
+$('aPoop').onclick=poop; { const ab=$('autoCamBtn'); const paint=()=>ab.textContent=`🎥 자동 시점: ${autoCam?'켜짐':'꺼짐'} (움직이면 카메라가 등 뒤로)`; paint(); ab.onclick=()=>{ autoCam=!autoCam; try{ localStorage.setItem('dm_autocam', autoCam?'1':'0'); }catch{} paint(); }; } $('aLie').onclick=lieToggle; $('aPet').onclick=()=>catLove('pet'); $('aChur').onclick=()=>catLove('churu'); $('aThrow').onclick=throwBottle; $('aWb').onclick=wbToggle;
 function updatePoopBtn(){ const show = me && !me.dead && (me.sit===TOILET.seat || Math.hypot(me.x-TOILET.x, me.z-TOILET.z) < 1.6);
   const b=$('aPoop'); if (b.style.display !== (show?'':'none')) b.style.display = show?'':'none';
   if (wantPoop===2 && me && !target){ const bz=1.24*SCALE, dx=(7.04+7.57)/2*SCALE; if (Math.hypot(me.x-dx, me.z-bz-0.45)<0.3){ wantPoop=3; goTo(dx, bz-0.4); } else wantPoop=false; return; }
@@ -1517,7 +1519,7 @@ addEventListener('blur', ()=>{ input.keys.clear(); runKey=false; });
     if (pts.size===2){ const [a,b]=[...pts.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); dist0=camDist; if (downAt) downAt.moved=true; } });
   canvas.addEventListener('pointermove', e=>{ const p=pts.get(e.pointerId); if (!p) return;
     const dx=e.clientX-p.x, dy=e.clientY-p.y; p.x=e.clientX; p.y=e.clientY;
-    if (pts.size===1){ camYaw -= dx*0.006; camPitch = clamp(camPitch + dy*0.005, 0.05, 1.25); if (downAt && Math.hypot(e.clientX-downAt.x,e.clientY-downAt.y)>8) downAt.moved=true; }
+    if (pts.size===1){ lastCamDrag=performance.now(); const touch=e.pointerType==='touch', ky=touch?0.012:0.006, kp=touch?0.004:0.005; camYaw -= dx*ky; if (!touch || Math.abs(dy)>Math.abs(dx)*0.7) camPitch = clamp(camPitch + dy*kp, 0.05, 1.25); /* 폰: 가로 감도↑, 대각선 드래그는 좌우만 */ if (downAt && Math.hypot(e.clientX-downAt.x,e.clientY-downAt.y)>8) downAt.moved=true; }
     else if (pts.size===2){ const [a,b]=[...pts.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); if (pinch0>0) camDist=clamp(dist0*pinch0/d,1.0,7); } });
   const up=e=>{ if (!pts.has(e.pointerId)) return; pts.delete(e.pointerId);
     if (pts.size===0 && downAt && !downAt.moved && performance.now()-downAt.t<400 && me){
@@ -1567,7 +1569,9 @@ function step(){
     me.run = m>0.15 && (runKey || joyRun) && !me.dead;
     if (m>0.15){ if (me.sit>=0) standUp(); target=null; const s=Math.min(1,m)/m; ix*=s; iz*=s;
       const sin=Math.sin(camYaw), cos=Math.cos(camYaw), SP=SPEED*(me.run?1.8:1);
-      vx = (ix*cos + iz*sin)*SP; vz = (-ix*sin + iz*cos)*SP; }
+      vx = (ix*cos + iz*sin)*SP; vz = (-ix*sin + iz*cos)*SP;
+      // 폰 조이스틱: 옆으로 가면 카메라가 천천히 등 뒤로 따라 돎 (화면을 계속 돌릴 필요 없게)
+      if (autoCam && (input.x||input.z) && iz<0.5 && performance.now()-lastCamDrag>900){ const want=Math.atan2(vx,vz)+Math.PI, d=Math.atan2(Math.sin(want-camYaw), Math.cos(want-camYaw)); camYaw += d*Math.min(1, dt*2.2*Math.min(1,Math.abs(ix)+0.15)); } }
     else if (target){ const dx=target.x-me.x, dz=target.z-me.z, d=Math.hypot(dx,dz);
       if (d<0.06 || (d<0.35 && target.seat>=0)){ if (target.seat>=0){ const s=seats[target.seat]; if (!seatTakenBy(target.seat)){ me.sit=target.seat; me.x=s.x; me.z=s.z; me.ry=s.ry; camYaw=s.ry+Math.PI; camPitch=Math.max(camPitch,0.5); target=null; } else { const j=nearestFreeSeat(me.x,me.z); target = j>=0 ? {x:seats[j].x,z:seats[j].z,seat:j} : null; if (j<0) toast('빈 자리가 없어요'); } } else target=null; sendMove(true); updateHUD(); }
       else { const sp=Math.min(SPEED, d/dt); vx=dx/d*sp; vz=dz/d*sp; } }
@@ -1616,7 +1620,7 @@ function step(){
 }
 requestAnimationFrame(step);
 setInterval(updateHUD, 3000);
-window.__dm = { get me(){return me;}, others, seats, act, NPC, CAT, setCam:(y)=>{ camYaw=y; }, setBac:v=>{bac=v;}, get bac(){return bac;} };
+window.__dm = { get me(){return me;}, others, seats, act, NPC, CAT, setCam:(y)=>{ camYaw=y; }, get camYaw(){ return camYaw; }, setBac:v=>{bac=v;}, get bac(){return bac;} };
 </script>
 </body>
 </html>
