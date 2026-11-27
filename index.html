@@ -57,6 +57,15 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 #help.show{display:block}
 #rank{top:calc(60px + env(safe-area-inset-top));right:10px;padding:10px 12px;font-size:13px;line-height:1.6;max-width:280px;max-height:70vh;overflow:auto;display:none;pointer-events:auto;z-index:8}
 #rank.show{display:block}
+#wb{position:fixed;inset:0;z-index:20;background:rgba(10,8,6,.88);display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 8px calc(8px + env(safe-area-inset-bottom));touch-action:none}
+#wb.show{display:flex}
+#wbc{background:#fff;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.5);touch-action:none;cursor:crosshair}
+#wbBar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center}
+#wbBar button{height:38px;min-width:38px;border-radius:12px;padding:0 10px;font-size:14px;font-weight:700}
+#wbBar .col{width:34px;min-width:34px;padding:0;border:3px solid rgba(255,255,255,.3)}
+#wbBar .on{outline:3px solid #ffd54a;outline-offset:1px}
+#wbInfo{color:#ddd;font-size:12px}
+#actions #aWb{grid-column:span 2;width:auto;flex-direction:row;gap:6px;font-size:15px;font-weight:700;background:#2f5f8f;border-color:#7fb2e5;color:#fff}
 #rank b{display:block;margin-top:8px}
 #rank .rk{color:var(--muted)}
 #rankClose{padding:2px 8px}
@@ -89,6 +98,10 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
     <button id="helpbtn">❔</button>
   </div>
 </div>
+<div id="wb"><div id="wbBar">
+  <button class="col on" data-c="#1d1d1f" style="background:#1d1d1f"></button><button class="col" data-c="#e53935" style="background:#e53935"></button><button class="col" data-c="#1e6fe0" style="background:#1e6fe0"></button><button class="col" data-c="#2e9d4a" style="background:#2e9d4a"></button><button class="col" data-c="#f39c12" style="background:#f39c12"></button><button class="col" data-c="#8e44ad" style="background:#8e44ad"></button>
+  <button id="wbThin" class="on">가늘게</button><button id="wbThick">굵게</button><button id="wbErase">🧽 지우개</button><button id="wbClear">🗑 전체 지우기</button><button id="wbClose">✕ 닫기 (B)</button>
+</div><canvas id="wbc"></canvas><div id="wbInfo">그린 건 자동 저장돼서 모두에게 보여요</div></div>
 <div id="rank" class="hud panel"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">🏆 명예의 전당</b><button id="rankClose">✕</button></div><div id="rankBody"></div></div>
 <div id="help" class="hud panel">
   <b style="color:var(--text)">조작법</b><br>
@@ -101,6 +114,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 <div id="chatlog" class="hud"></div>
 <div id="joy" class="hud panel"><i></i></div>
 <div id="actions" class="hud">
+  <button id="aWb" style="display:none" data-key="B" title="단축키 B"><span>🖍️</span>화이트보드</button>
   <button id="aPoop" style="display:none" data-key="P" title="단축키 P"><span>💩</span>똥싸기</button>
   <button id="aPour" data-key="1" title="단축키 1"><span>🍶</span>따르기</button>
   <button id="aCheers" data-key="2" title="단축키 2"><span>🥂</span>짠!</button>
@@ -134,7 +148,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127a';
+window.APP_VER='v20261127b';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -712,7 +726,7 @@ function connect(){
   let sb;
   try { sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth:{ persistSession:false, autoRefreshToken:false }, realtime:{ params:{ eventsPerSecond: 15 } } }); }
   catch(e){ console.error(e); $('count').textContent='서버 연결 실패 (혼자 모드)'; return; }
-  SBC = sb; setTimeout(loadBoard, 800); setInterval(loadBoard, 30000);
+  SBC = sb; setTimeout(loadBoard, 800); setTimeout(wbLoad, 900); setInterval(()=>{ if (!wbOpen) wbLoad(); }, 120000); setInterval(loadBoard, 30000);
   channel = sb.channel('dmark-hangout-'+ROOM, { config: { broadcast: { self:false, ack:false }, presence: { key: myId } } });
   channel.on('presence', { event:'sync' }, applyPresence);
   channel.on('broadcast', { event:'mv' }, ({payload:p})=>{
@@ -726,6 +740,8 @@ function connect(){
   });
   channel.on('broadcast', { event:'chat' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); const text=String(p.text||'').slice(0,120); if (!text) return; const name=o?o.av.name:'누군가'; addChat(name, text, o?o.av.color:'#ccc'); if (o) o.av.say(text); });
   channel.on('broadcast', { event:'act' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o) return; if (p.type==='respawn'){ o.net=null; o.target=null; } doActEffect(o.av, String(p.type), p, false); });
+  channel.on('broadcast', { event:'wb' }, ({payload:p})=>{ if (!p || p.id===myId || !Array.isArray(p.p) || p.p.length>4000) return; wbAdd({ c:String(p.c).slice(0,7), w:clamp(num(p.w,6),1,80), p:p.p.map(Number) }, false); });
+  channel.on('broadcast', { event:'wbclear' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); wbClearAll(false); sys(`🗑 ${o?o.av.name:'누군가'}님이 화이트보드를 지웠어요`); });
   channel.on('broadcast', { event:'npcatk' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o || !ATTACKS[p.type]) return; NPC.showAtk(p.type); applyHit(o.av, p.type, NPC.av); });
   channel.on('broadcast', { event:'atk' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); const A=ATTACKS[p.type]; if (!o || !A || o.av.dead) return;
     o.av.atk=A.dur; o.av.atkDur=A.dur; o.av.atkType=p.type; o.av.ry=num(p.ry,o.av.ry); if (near(o.av)) swoosh();
@@ -901,6 +917,45 @@ function drawBoard(){
     el.appendChild(ol); }
 }
 drawBoard();
+/* ---------------- 화이트보드 (주방 왼쪽 벽): 누구나 그림, 서버 저장 + 실시간 공유 ---------------- */
+const WB_W=1600, WB_H=1000, WB = { x: 3.08*SCALE+T/2+0.02, z: 4.95, y: 1.45, w: 1.7, h: 1.06 };
+let wbStrokes = [], wbOpen = false;
+const wbTexCv=document.createElement('canvas'); wbTexCv.width=1024; wbTexCv.height=640; const wbTex=new THREE.CanvasTexture(wbTexCv); wbTex.colorSpace=THREE.SRGBColorSpace;
+{ const fr=new THREE.Mesh(new THREE.BoxGeometry(0.03, WB.h+0.07, WB.w+0.07), mat('#b8bcc2')); fr.position.set(WB.x, WB.y, WB.z); scene.add(fr);
+  const pl=new THREE.Mesh(new THREE.PlaneGeometry(WB.w, WB.h), new THREE.MeshBasicMaterial({ map:wbTex })); pl.rotation.y=Math.PI/2; pl.position.set(WB.x+0.017, WB.y, WB.z); scene.add(pl);
+  const tray=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.025,WB.w*0.9), mat('#9aa0a6')); tray.position.set(WB.x+0.04, WB.y-WB.h/2-0.03, WB.z); scene.add(tray);
+  [['#e53935',-0.2],['#1e6fe0',-0.1],['#1d1d1f',0]].forEach(([c,o])=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.1,8), mat(c)); m.rotation.x=Math.PI/2; m.position.set(WB.x+0.045, WB.y-WB.h/2-0.008, WB.z+o); scene.add(m); }); }
+function wbStroke(g, s, k){ const p=s.p; if (!p || p.length<2) return; g.strokeStyle=s.c; g.lineWidth=s.w*k; g.lineCap='round'; g.lineJoin='round'; g.beginPath(); g.moveTo(p[0]*k, p[1]*k);
+  if (p.length===2) g.lineTo(p[0]*k+0.01, p[1]*k); else for (let i=2;i<p.length;i+=2) g.lineTo(p[i]*k, p[i+1]*k); g.stroke(); }
+function wbRender(g, W, H, list){ g.fillStyle='#fff'; g.fillRect(0,0,W,H); const k=W/WB_W; for (const s of list) wbStroke(g, s, k); }
+function wbDrawTex(){ const g=wbTexCv.getContext('2d'); wbRender(g, 1024, 640, wbStrokes);
+  if (!wbStrokes.length){ g.fillStyle='rgba(0,0,0,.28)'; g.font='bold 46px "Apple SD Gothic Neo","Noto Sans KR",sans-serif'; g.textAlign='center'; g.fillText('🖍️ 화이트보드', 512, 300); g.font='30px "Apple SD Gothic Neo","Noto Sans KR",sans-serif'; g.fillText('가까이 와서 B 키 (또는 버튼)', 512, 350); }
+  wbTex.needsUpdate=true; }
+wbDrawTex();
+async function wbLoad(){ if (!SBC) return; try { const { data, error } = await SBC.rpc('dmark_wb_get', { p_room:ROOM }); if (!error && Array.isArray(data)){ wbStrokes=data; wbDrawTex(); if (wbOpen) wbPaint(); } } catch (e) { console.warn(e); } }
+function wbAdd(s, mine){ wbStrokes.push(s); if (wbStrokes.length>5000) wbStrokes.shift(); wbDrawTex(); if (wbOpen) wbPaint(); if (mine){ send('wb', s); if (SBC) try { SBC.rpc('dmark_wb_add', { p_room:ROOM, p_name:me?me.name.slice(0,20):'', p_color:s.c, p_w:s.w, p_pts:s.p }).then(()=>{}, ()=>{}); } catch {} } }
+function wbClearAll(mine){ wbStrokes=[]; wbDrawTex(); if (wbOpen) wbPaint(); if (mine){ send('wbclear', {}); if (SBC) try { SBC.rpc('dmark_wb_clear', { p_room:ROOM }).then(()=>{}, ()=>{}); } catch {} sys(`🗑 ${me.name}님이 화이트보드를 지웠어요`); } }
+// 펼친 화이트보드
+const wbc=$('wbc'); let wbCur=null, wbColor='#1d1d1f', wbSize=6, wbErasing=false, wbScale=1;
+function wbFit(){ const bar=$('wbBar').offsetHeight+40; const aw=innerWidth-16, ah=innerHeight-bar-40; let w=aw, h=w*WB_H/WB_W; if (h>ah){ h=ah; w=h*WB_W/WB_H; } const dpr=Math.min(2, devicePixelRatio||1);
+  wbc.style.width=w+'px'; wbc.style.height=h+'px'; wbc.width=Math.round(w*dpr); wbc.height=Math.round(h*dpr); wbScale=WB_W/w; wbPaint(); }
+function wbPaint(){ const g=wbc.getContext('2d'); wbRender(g, wbc.width, wbc.height, wbStrokes); if (wbCur) wbStroke(g, wbCur, wbc.width/WB_W); }
+function wbShow(on){ wbOpen=on; $('wb').classList.toggle('show', on); if (on){ input.keys.clear(); target=null; wbFit(); wbLoad(); } }
+function wbPt(e){ const r=wbc.getBoundingClientRect(); return [Math.round(clamp((e.clientX-r.left)*wbScale,0,WB_W)), Math.round(clamp((e.clientY-r.top)*wbScale,0,WB_H))]; }
+function wbEnd(){ if (!wbCur) return; const s=wbCur; wbCur=null; if (s.p.length>=2) wbAdd(s, true); }
+wbc.addEventListener('pointerdown', e=>{ e.preventDefault(); wbc.setPointerCapture(e.pointerId); wbCur={ c: wbErasing?'#ffffff':wbColor, w: wbErasing?44:wbSize, p: wbPt(e) }; wbPaint(); });
+wbc.addEventListener('pointermove', e=>{ if (!wbCur) return; const [x,y]=wbPt(e), p=wbCur.p; if (Math.hypot(x-p[p.length-2], y-p[p.length-1])<3) return; p.push(x,y); wbPaint();
+  if (p.length>=3000){ const last=[x,y], c=wbCur.c, w=wbCur.w; wbEnd(); wbCur={ c, w, p:last }; } });
+wbc.addEventListener('pointerup', wbEnd); wbc.addEventListener('pointercancel', wbEnd);
+document.querySelectorAll('#wbBar .col').forEach(b=>b.onclick=()=>{ wbColor=b.dataset.c; wbErasing=false; document.querySelectorAll('#wbBar .col,#wbErase').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
+$('wbThin').onclick=()=>{ wbSize=6; $('wbThin').classList.add('on'); $('wbThick').classList.remove('on'); };
+$('wbThick').onclick=()=>{ wbSize=16; $('wbThick').classList.add('on'); $('wbThin').classList.remove('on'); };
+$('wbErase').onclick=()=>{ wbErasing=true; document.querySelectorAll('#wbBar .col').forEach(x=>x.classList.remove('on')); $('wbErase').classList.add('on'); };
+$('wbClear').onclick=()=>{ if ($('wbClear').dataset.arm){ delete $('wbClear').dataset.arm; $('wbClear').textContent='🗑 전체 지우기'; wbClearAll(true); } else { $('wbClear').dataset.arm='1'; $('wbClear').textContent='정말 지울까요? 한 번 더'; setTimeout(()=>{ delete $('wbClear').dataset.arm; $('wbClear').textContent='🗑 전체 지우기'; }, 3000); } };
+$('wbClose').onclick=()=>wbShow(false);
+addEventListener('resize', ()=>{ if (wbOpen) wbFit(); });
+const wbNear = () => me && !me.dead && Math.hypot(me.x-WB.x, me.z-WB.z) < 2.2;
+function wbToggle(){ if (wbOpen) return wbShow(false); if (!wbNear()){ toast('화이트보드 앞으로 가서 눌러요 🖍️ (주방 왼쪽 벽)'); return; } wbShow(true); }
 /* ---------------- 술 취함: 3병부터 어질어질, 5병이면 기절 ---------------- */
 let bac = 0, faintUntil = 0; // bac = 몸에 남은 술(병). 4분에 1병씩 깸
 const drunkK = () => clamp((bac-3)/2, 0, 1);
@@ -966,7 +1021,7 @@ function poop(){ if (!me || me.dead) return; audio();
     const bz=1.24*SCALE, dx=(7.04+7.57)/2*SCALE; if (me.z>bz){ wantPoop=2; goTo(dx, bz+0.45); } else { wantPoop=true; sitAt(TOILET.seat); } return; }
   if (performance.now()<poopCd){ toast('아직 안 나와요… 😣'); return; }
   poopCd=performance.now()+6000; record('poop',1); doActEffect(me,'poop',null,true); send('act',{type:'poop'}); }
-$('aPoop').onclick=poop;
+$('aPoop').onclick=poop; $('aWb').onclick=wbToggle;
 function updatePoopBtn(){ const show = me && !me.dead && (me.sit===TOILET.seat || Math.hypot(me.x-TOILET.x, me.z-TOILET.z) < 1.6);
   const b=$('aPoop'); if (b.style.display !== (show?'':'none')) b.style.display = show?'':'none';
   if (wantPoop===2 && me && !target){ const bz=1.24*SCALE, dx=(7.04+7.57)/2*SCALE; if (Math.hypot(me.x-dx, me.z-bz-0.45)<0.3){ wantPoop=3; goTo(dx, bz-0.4); } else wantPoop=false; return; }
@@ -1076,10 +1131,11 @@ $('invite').onclick=async ()=>{ const url = location.href.split('#')[0];
 function keyOf(e){ const c=e.code||''; if (c.startsWith('Key')) return c.slice(3).toLowerCase(); if (c.startsWith('Digit')) return c.slice(5); if (c.startsWith('Numpad') && /\d$/.test(c)) return c.slice(-1); return (e.key||'').toLowerCase(); }
 addEventListener('keydown', e=>{
   if (document.activeElement===$('chatin') || document.activeElement===$('nameIn')){ if (e.key==='Escape') document.activeElement.blur(); return; }
+  if (wbOpen){ const k=keyOf(e); if (k==='b' || e.key==='Escape') wbShow(false); return; }
   if (e.key==='Enter'){ e.preventDefault(); $('chatin').focus(); return; }
   if (e.code==='Space'){ e.preventDefault(); jump(); return; }
   const k=keyOf(e); input.keys.add(k);
-  if (k==='1') act('pour'); if (k==='2') act('cheers'); if (k==='3') act('shot'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop(); if (k==='c') drinkCondition();
+  if (k==='1') act('pour'); if (k==='2') act('cheers'); if (k==='3') act('shot'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop(); if (k==='c') drinkCondition(); if (k==='b') wbToggle();
 });
 addEventListener('keyup', e=>input.keys.delete(keyOf(e)));
 addEventListener('blur', ()=>input.keys.clear());
@@ -1136,7 +1192,7 @@ const clock=new THREE.Clock(); const camTarget=new THREE.Vector3(); const camRay
 camera.position.set(HOUSE.table.x, 1.8, 5.2); camera.lookAt(HOUSE.table.x, 0.6, HOUSE.table.z);
 function step(){
   let dt=Math.min(0.05, clock.getDelta()); const t=clock.elapsedTime; if (performance.now()<hitStopUntil) dt*=0.08;
-  updatePoopBtn();
+  updatePoopBtn(); { const b=$('aWb'), sh=wbNear(); if (b.style.display!==(sh?'':'none')) b.style.display=sh?'':'none'; }
   if (me){
     // 입력 → 이동 (카메라 기준)
     let ix=input.x, iz=input.z; const K=input.keys;
