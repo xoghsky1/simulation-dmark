@@ -59,6 +59,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 #help.show{display:block}
 #rank{top:calc(60px + env(safe-area-inset-top));right:10px;padding:10px 12px;font-size:13px;line-height:1.6;max-width:280px;max-height:70vh;overflow:auto;display:none;pointer-events:auto;z-index:8}
 #rank.show{display:block}
+#joy.run{border-color:#ff9f1a;box-shadow:0 0 18px rgba(255,159,26,.55)}#joy.run i{background:#ff9f1a}#joy.run::after{content:'🏃 달리기';position:absolute;top:-24px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:800;color:#ffcf8a;white-space:nowrap}
 #kfeed{position:fixed;top:calc(62px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));z-index:6;display:flex;flex-direction:column;align-items:flex-end;gap:4px;pointer-events:none;max-width:70vw}
 #kfeed div{background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:4px 9px;font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70vw;transition:opacity .5s,transform .3s;animation:kin .25s ease-out}
 #kfeed div.me{border-color:#ffd54a;background:rgba(60,45,0,.8)}#kfeed .w{display:inline-block;margin:0 6px;font-size:15px}#kfeed .v{color:#ff8a80}#kfeed .a{color:#9fe8ff}
@@ -170,7 +171,7 @@ body.touch #chatlog{bottom:calc(210px + env(safe-area-inset-bottom));width:min(5
 </script>
 <script>
 // 옛 버전이 캐시에 남아 친구끼리 안 보이는 일 방지: 새 버전이 올라오면 자동 새로고침
-window.APP_VER='v20261127p';
+window.APP_VER='v20261127q';
 setInterval(function(){
   fetch(location.pathname+'?ver='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
     var m=t.match(/APP_VER='([^']+)'/); if(m&&m[1]!==window.APP_VER) location.reload();
@@ -705,7 +706,9 @@ class Avatar {
     const seat = this.sit>=0 ? seats[this.sit] : null;
     const targetY = this.dead ? 0.12 : seat ? (seat.kind==='sofa' ? 0.42-0.5 : seat.kind==='toilet' ? 0.46-0.5 : 0.07-0.48) : 0;
     this.body.position.y += (targetY - this.body.position.y) * Math.min(1, dt*10);
-    if (this.moving){ this.walk += dt*9; this.body.position.y += Math.abs(Math.sin(this.walk))*0.035; this.body.rotation.z = Math.sin(this.walk)*0.04; }
+    this.lean = (this.lean||0) + (((this.moving&&this.run)?0.28:0) - (this.lean||0))*Math.min(1,dt*8); this.body.rotation.x = this.lean;
+    if (this.moving){ const r=this.run; this.walk += dt*(r?16:9); this.body.position.y += Math.abs(Math.sin(this.walk))*(r?0.07:0.035); this.body.rotation.z = Math.sin(this.walk)*(r?0.07:0.04);
+      if (r && !this.atk && this.raise<=0) this.arm.rotation.x = Math.sin(this.walk)*0.9; } else if (this.arm.rotation.x && !this.atk && this.raise<=0 && this.run===false) this.arm.rotation.x*=0.8;
     else { const dr = this===me ? (drunkK()>0 ? bac*EMPTY_BOTTLES_PER : 0) : this.drinks; this.body.rotation.z = Math.sin(t*1.3+this.x)*Math.min(dr,18)*0.006; }
     this.jump=Math.max(0,this.jump-dt); const jp=this.jump>0 ? 1-this.jump/0.6 : 0;
     this.g.position.set(this.x, this.jump>0 ? 4*0.6*jp*(1-jp) : 0, this.z);
@@ -834,8 +837,8 @@ function connect(){
     if (num(p.bf)>(o.av.buffUntil||0)) o.av.setBuff(Math.min(num(p.bf), Date.now()+61000));
     if (p.tx!=null){ o.target={ x:clamp(num(p.tx),0,HOUSE.W), z:clamp(num(p.tz),0,HOUSE.D), seat: Number.isInteger(p.ts)&&seats[p.ts]?p.ts:-1 }; o.net=null; o.av.sit=-1;
       if (Math.hypot(o.av.x-x,o.av.z-z)>1.2){ o.av.x=x; o.av.z=z; } }
-    else { o.target=null; o.net={ x, z, vx:clamp(num(p.vx),-3,3), vz:clamp(num(p.vz),-3,3), ry:num(p.ry), t:performance.now() };
-      o.av.sit = Number.isInteger(p.sit)&&seats[p.sit] ? p.sit : -1; if (o.av.sit>=0){ o.av.x=seats[o.av.sit].x; o.av.z=seats[o.av.sit].z; o.av.ry=seats[o.av.sit].ry; o.net=null; } }
+    else { o.target=null; o.net={ x, z, vx:clamp(num(p.vx),-5,5), vz:clamp(num(p.vz),-5,5), ry:num(p.ry), t:performance.now() };
+      o.av.run = Math.hypot(num(p.vx),num(p.vz))>2.6; o.av.sit = Number.isInteger(p.sit)&&seats[p.sit] ? p.sit : -1; if (o.av.sit>=0){ o.av.x=seats[o.av.sit].x; o.av.z=seats[o.av.sit].z; o.av.ry=seats[o.av.sit].ry; o.net=null; } }
   });
   channel.on('broadcast', { event:'chat' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); const text=String(p.text||'').slice(0,120); if (!text) return; const name=o?o.av.name:'누군가'; addChat(name, text, o?o.av.color:'#ccc'); if (o) o.av.say(text); });
   channel.on('broadcast', { event:'act' }, ({payload:p})=>{ if (!p || p.id===myId) return; const o=others.get(p.id); if (!o) return; if (p.type==='respawn'){ o.net=null; o.target=null; } doActEffect(o.av, String(p.type), p, false); });
@@ -1369,24 +1372,25 @@ $('invite').onclick=async ()=>{ const url = location.href.split('#')[0];
 
 /* ---------------- 입력 ---------------- */
 // 한글 입력 상태에서도 되도록 물리 키(code) 기준
+const MOVE_KEYS=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']); let lastMoveKey='', lastMoveT=0, runKey=false;
 function keyOf(e){ const c=e.code||''; if (c.startsWith('Key')) return c.slice(3).toLowerCase(); if (c.startsWith('Digit')) return c.slice(5); if (c.startsWith('Numpad') && /\d$/.test(c)) return c.slice(-1); return (e.key||'').toLowerCase(); }
 addEventListener('keydown', e=>{
   if (document.activeElement===$('chatin') || document.activeElement===$('nameIn')){ if (e.key==='Escape') document.activeElement.blur(); return; }
   if (wbOpen){ const k=keyOf(e); if (k==='b' || e.key==='Escape') wbShow(false); return; }
   if (e.key==='Enter'){ e.preventDefault(); $('chatin').focus(); return; }
   if (e.code==='Space'){ e.preventDefault(); jump(); return; }
-  const k=keyOf(e); input.keys.add(k);
+  const k=keyOf(e); if (MOVE_KEYS.has(k) && !e.repeat){ const now=performance.now(); if (lastMoveKey===k && now-lastMoveT<320) runKey=true; lastMoveKey=k; lastMoveT=now; } input.keys.add(k);
   if (k==='1' || k==='3') drinkOne(); if (k==='2') act('cheers'); if (k==='e') $('aSit').onclick(); if (k==='4') sayOut('줴줴이야'); if (k==='f') attack('punch'); if (k==='g') attack('kick'); if (k==='p') poop(); if (k==='c') drinkCondition(); if (k==='b') wbToggle(); if (k==='t') throwBottle();
 });
-addEventListener('keyup', e=>input.keys.delete(keyOf(e)));
-addEventListener('blur', ()=>input.keys.clear());
+addEventListener('keyup', e=>{ input.keys.delete(keyOf(e)); if (![...input.keys].some(k=>MOVE_KEYS.has(k))) runKey=false; });
+addEventListener('blur', ()=>{ input.keys.clear(); runKey=false; });
 
 // 조이스틱
 { const joy=$('joy'), knob=joy.querySelector('i'); let pid=null;
-  const move=e=>{ const r=joy.getBoundingClientRect(); let dx=e.clientX-(r.left+r.width/2), dy=e.clientY-(r.top+r.height/2); const m=Math.hypot(dx,dy), max=r.width/2-10; if (m>max){ dx*=max/m; dy*=max/m; } knob.style.transform=`translate(${dx}px,${dy}px)`; input.x=dx/max; input.z=dy/max; };
+  const move=e=>{ const r=joy.getBoundingClientRect(); let dx=e.clientX-(r.left+r.width/2), dy=e.clientY-(r.top+r.height/2); const m=Math.hypot(dx,dy), max=r.width/2-10; if (m>max){ dx*=max/m; dy*=max/m; } knob.style.transform=`translate(${dx}px,${dy}px)`; input.x=dx/max; input.z=dy/max; joy.classList.toggle('run', Math.hypot(input.x,input.z)>0.92); };
   joy.addEventListener('pointerdown', e=>{ pid=e.pointerId; joy.setPointerCapture(pid); move(e); audio(); });
   joy.addEventListener('pointermove', e=>{ if (e.pointerId===pid) move(e); });
-  const end=e=>{ if (e.pointerId!==pid) return; pid=null; knob.style.transform=''; input.x=0; input.z=0; };
+  const end=e=>{ if (e.pointerId!==pid) return; pid=null; joy.classList.remove('run'); knob.style.transform=''; input.x=0; input.z=0; };
   joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
 }
 // 카메라 드래그 / 핀치 / 탭 이동
@@ -1440,10 +1444,11 @@ function step(){
     if (me.dead){ ix=0; iz=0; target=null; K.clear(); }
     if (K.has('w')||K.has('arrowup')) iz-=1; if (K.has('s')||K.has('arrowdown')) iz+=1; if (K.has('a')||K.has('arrowleft')) ix-=1; if (K.has('d')||K.has('arrowright')) ix+=1;
     { const k=drunkK(); if (k>0 && (ix||iz)){ const sw=Math.sin(t*1.9)*k*0.7; const nx=ix - iz*sw, nz=iz + ix*sw; ix=nx; iz=nz; } }
-    const m=Math.hypot(ix,iz); let vx=0, vz=0;
+    const m=Math.hypot(ix,iz); let vx=0, vz=0; const joyRun = Math.hypot(input.x,input.z)>0.92;
+    me.run = m>0.15 && (runKey || joyRun) && !me.dead;
     if (m>0.15){ if (me.sit>=0) standUp(); target=null; const s=Math.min(1,m)/m; ix*=s; iz*=s;
-      const sin=Math.sin(camYaw), cos=Math.cos(camYaw);
-      vx = (ix*cos + iz*sin)*SPEED; vz = (-ix*sin + iz*cos)*SPEED; }
+      const sin=Math.sin(camYaw), cos=Math.cos(camYaw), SP=SPEED*(me.run?1.8:1);
+      vx = (ix*cos + iz*sin)*SP; vz = (-ix*sin + iz*cos)*SP; }
     else if (target){ const dx=target.x-me.x, dz=target.z-me.z, d=Math.hypot(dx,dz);
       if (d<0.06 || (d<0.35 && target.seat>=0)){ if (target.seat>=0){ const s=seats[target.seat]; if (!seatTakenBy(target.seat)){ me.sit=target.seat; me.x=s.x; me.z=s.z; me.ry=s.ry; camYaw=s.ry+Math.PI; camPitch=Math.max(camPitch,0.5); target=null; } else { const j=nearestFreeSeat(me.x,me.z); target = j>=0 ? {x:seats[j].x,z:seats[j].z,seat:j} : null; if (j<0) toast('빈 자리가 없어요'); } } else target=null; sendMove(true); updateHUD(); }
       else { const sp=Math.min(SPEED, d/dt); vx=dx/d*sp; vz=dz/d*sp; } }
